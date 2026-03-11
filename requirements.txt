@@ -5,6 +5,8 @@ pypdf
 python-docx
 python-multipart
 pydantic
+pydantic-settings
+typer
 requests
 python-dotenv
 pytest
