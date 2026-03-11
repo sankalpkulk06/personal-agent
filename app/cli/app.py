@@ -4,6 +4,7 @@ from typing import Optional
 import typer
 
 from app import __version__
+from app.cli.commands_chat import chat_command
 from app.config import get_settings
 from app.cli.commands_ask import ask_command
 from app.cli.commands_ingest import ingest_command
@@ -57,3 +58,10 @@ def ask(
     top_k: Optional[int] = typer.Option(None, "--top-k", help="Override number of retrieved chunks."),
 ) -> None:
     ask_command(question=question, top_k=top_k)
+
+
+@cli.command("chat")
+def chat(
+    top_k: Optional[int] = typer.Option(None, "--top-k", help="Default retrieval depth for chat session."),
+) -> None:
+    chat_command(top_k=top_k)

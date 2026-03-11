@@ -73,6 +73,17 @@ Ask a grounded question:
 python -m app.main ask "What did I write about vector databases?"
 ```
 
+Start interactive chat mode (basic):
+
+```bash
+python -m app.main chat
+```
+
+In chat mode:
+- `exit` or `quit` to leave
+- `/help` to show commands
+- `/topk 3` to set retrieval depth for the current session
+
 Optional retrieval depth override:
 
 ```bash

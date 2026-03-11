@@ -11,10 +11,10 @@ def test_cli_help_works():
     assert result.exit_code == 0
     assert "Local-first personal RAG agent CLI." in result.stdout
     assert "config" in result.stdout
+    assert "chat" in result.stdout
 
 
 def test_cli_version_flag():
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
     assert "personal-rag-study-agent" in result.stdout
-
