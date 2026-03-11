@@ -1,108 +1,100 @@
 # Personal RAG Study Agent
 
-A local-first personal knowledge agent that understands your own documents and lets you ask questions about them securely.
+Local-first personal knowledge assistant for your own files.
 
-## Vision
+## What Phase 1 MVP does
 
-The goal of this project is to build an agent that has access to **your local data only**, runs **fully on your machine**, and helps you interact with your personal knowledge in a natural way.
+- Ingest local `.txt`, `.md`, and `.pdf` files.
+- Chunk document text deterministically.
+- Generate embeddings with local Ollama models.
+- Persist metadata in SQLite and vectors in ChromaDB.
+- Answer questions grounded in retrieved local context.
+- Run fully on your machine (no cloud dependency required by design).
 
-Instead of uploading private files to a third-party service, this project is designed around a simple idea:
+## Prerequisites
 
-**your data stays with you**
+- Python 3.9+
+- Ollama installed and running locally
 
-This agent should make it possible to:
+## Setup
 
-- connect to your local documents
-- build context from your personal knowledge base
-- answer questions grounded in your own files
-- run securely on-device or in a local environment
-- give you a simple way to explore everything you already know
+```bash
+git clone <your-repo-url>
+cd personal-agent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-## What this project aims to be
+## Ollama setup
 
-This project is meant to become a **personal knowledge agent** that can understand and reason over:
+Start Ollama (in a separate terminal if needed):
 
-- notes
-- PDFs
-- markdown files
-- resumes
-- project documentation
-- research papers
-- class material
-- personal knowledge files
+```bash
+ollama serve
+```
 
-You should be able to ask it questions like:
+Pull recommended models:
 
-- What did I write about RAG in my notes?
-- Summarize my distributed systems notes
-- Which of my documents mention pgvector?
-- What projects in my files involve embeddings or retrieval?
-- Explain a concept from my own study material
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3.2:3b
+```
 
-## Core principles
+Optional `.env` configuration:
 
-### 1. Local-first
-The system is designed to run locally so that your personal documents do not need to leave your machine.
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+OLLAMA_CHAT_MODEL=llama3.2:3b
+CHUNK_SIZE=800
+CHUNK_OVERLAP=120
+RETRIEVAL_TOP_K=5
+DATA_DIR=./data
+```
 
-### 2. Secure by design
-Your files are private and should remain under your control. The agent should work with local data sources and local storage wherever possible.
+## CLI usage
 
-### 3. Grounded in your data
-This is not meant to be a generic chatbot. Its value comes from answering questions based on **your personal documents and context**.
+Show config:
 
-### 4. Useful and practical
-The project should solve real problems, such as searching notes, summarizing documents, connecting ideas across files, and helping with study or recall.
+```bash
+python -m app.main config
+```
 
-### 5. Extensible
-The first version will be simple, but the system should be designed so it can later support richer agent workflows such as summarization, comparison, quiz generation, and multi-step reasoning over documents.
+Ingest a file or folder:
 
-## Long-term idea
+```bash
+python -m app.main ingest --path "./data/my-notes"
+```
 
-Over time, this project should evolve from a simple local RAG app into a true personal agent that can:
+Ask a grounded question:
 
-- retrieve relevant context from your files
-- answer questions with source grounding
-- summarize and organize personal knowledge
-- compare multiple documents
-- help with studying and revision
-- act as a secure interface to your own data
+```bash
+python -m app.main ask "What did I write about vector databases?"
+```
 
-## Why this project matters
+Optional retrieval depth override:
 
-There is a growing need for AI systems that are useful **without giving up privacy**.
+```bash
+python -m app.main ask "Summarize my distributed systems notes" --top-k 7
+```
 
-A lot of personal knowledge is scattered across documents, folders, notes, and project files. This agent is an attempt to create a secure local system that turns that data into something searchable, understandable, and interactive.
+## Testing
 
-The vision is simple:
+```bash
+python -m pytest -q
+```
 
-**a private agent for your personal data, running locally, with context from your own files, so you can ask it anything about what you already have.**
+## Current limitations
 
-## Initial scope
+- Supports only `.txt`, `.md`, `.pdf` parsing.
+- No OCR or scanned-PDF extraction.
+- No reranking/hybrid retrieval.
+- No long-term conversational memory.
+- CLI-only interface in Phase 1.
 
-The first version of this project will focus on:
+## Next steps
 
-- ingesting local documents
-- building embeddings over document chunks
-- retrieving relevant context for a user query
-- answering questions based on personal files
-- keeping the workflow local and secure
-
-## Future directions
-
-Planned capabilities may include:
-
-- source-backed answers
-- document summarization
-- topic extraction
-- personal study assistant workflows
-- flashcard and quiz generation
-- document comparison
-- metadata-based filtering
-- lightweight agentic tool routing
-
-## Status
-
-This repository is the starting point for building a secure, local-first personal knowledge agent from scratch.
-
----
-Built with the idea that personal AI should be private, useful, and grounded in your own data.
+- Improve prompt quality and citation formatting.
+- Add metadata filters during retrieval.
+- Add optional summarization/study workflows.

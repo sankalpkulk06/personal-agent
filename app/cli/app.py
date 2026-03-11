@@ -1,7 +1,12 @@
+from pathlib import Path
+from typing import Optional
+
 import typer
 
 from app import __version__
 from app.config import get_settings
+from app.cli.commands_ask import ask_command
+from app.cli.commands_ingest import ingest_command
 
 cli = typer.Typer(
     add_completion=False,
@@ -39,3 +44,16 @@ def show_config() -> None:
     typer.echo(f"data_dir={paths.data_dir}")
     typer.echo(f"chroma_dir={paths.chroma_dir}")
     typer.echo(f"sqlite_db_path={paths.sqlite_db_path}")
+
+
+@cli.command("ingest")
+def ingest(path: str = typer.Option(..., "--path", "-p", help="File or directory path to ingest.")) -> None:
+    ingest_command(path=Path(path))
+
+
+@cli.command("ask")
+def ask(
+    question: str = typer.Argument(..., help="Question to ask about your local documents."),
+    top_k: Optional[int] = typer.Option(None, "--top-k", help="Override number of retrieved chunks."),
+) -> None:
+    ask_command(question=question, top_k=top_k)
