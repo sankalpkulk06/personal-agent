@@ -100,6 +100,7 @@ def test_prompt_builder_output_shape():
     assert "Question:" in prompt
     assert "Context:" in prompt
     assert "I don't know based on the provided documents." in prompt
+    assert "If the user asks about a specific file" in prompt
 
 
 def test_qa_service_orchestration(tmp_path):
@@ -122,4 +123,3 @@ def test_qa_service_orchestration(tmp_path):
         assert len(chat.prompts) == 1
     finally:
         sqlite_registry.close()
-
