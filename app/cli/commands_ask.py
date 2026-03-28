@@ -1,14 +1,19 @@
 from typing import Optional
 
 import typer
+from rich.console import Console
 
 from app.config import get_settings
 from app.core.qa_service import QAService
+from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaEmbeddingsProvider, OllamaProviderError
 from app.retrieval.retriever import Retriever
 from app.storage.chroma_store import ChromaStore
 from app.storage.sqlite_registry import SQLiteRegistry
+from app.ui.spinner import thinking_spinner
+
+console = Console()
 
 
 def create_qa_service() -> QAService:
@@ -33,10 +38,12 @@ def create_qa_service() -> QAService:
 def ask_command(
     question: str = typer.Argument(..., help="Question to ask about your local documents."),
     top_k: Optional[int] = typer.Option(None, "--top-k", help="Override number of retrieved chunks."),
+    export: bool = typer.Option(False, "--export", help="Export answer to Markdown file."),
 ) -> None:
     service = create_qa_service()
     try:
-        result = service.answer_question(question=question, top_k=top_k)
+        with thinking_spinner("thinking..."):
+            result = service.answer_question(question=question, top_k=top_k)
     except OllamaProviderError as exc:
         typer.echo(f"Error: Ollama unavailable: {exc}")
         raise typer.Exit(code=1)
@@ -44,19 +51,24 @@ def ask_command(
         typer.echo(f"Error: ask failed: {exc}")
         raise typer.Exit(code=1)
 
-    if not result.sources:
-        typer.echo("No relevant sources found in indexed documents.")
-
-    typer.echo("Answer:")
-    typer.echo(result.answer)
+    console.print("[bold magenta]answer[/bold magenta]")
+    console.print(result.answer)
 
     if result.sources:
-        typer.echo("Sources:")
+        console.print("\n[bold magenta]sources[/bold magenta]")
         seen = set()
         for source in result.sources:
             source_label = source.file_name or source.source_path or source.document_id
             if source_label in seen:
                 continue
             seen.add(source_label)
-            typer.echo(f"- {source_label}")
+            console.print(f"[dim]- {source_label}[/dim]")
+    else:
+        console.print("\n[dim]sources: none[/dim]")
+
+    if export:
+        settings = get_settings()
+        paths = settings.resolve_paths()
+        filepath = export_qa_to_markdown(result, paths.reports_dir)
+        console.print(f"\n[green]✓ Exported to: {filepath}[/green]")
 
