@@ -56,8 +56,9 @@ def ingest(path: str = typer.Option(..., "--path", "-p", help="File or directory
 def ask(
     question: str = typer.Argument(..., help="Question to ask about your local documents."),
     top_k: Optional[int] = typer.Option(None, "--top-k", help="Override number of retrieved chunks."),
+    export: bool = typer.Option(False, "--export", help="Export answer to Markdown file."),
 ) -> None:
-    ask_command(question=question, top_k=top_k)
+    ask_command(question=question, top_k=top_k, export=export)
 
 
 @cli.command("chat")
