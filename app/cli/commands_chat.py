@@ -1,9 +1,13 @@
 from typing import Optional
 
 import typer
+from rich.console import Console
 
 from app.cli.commands_ask import create_qa_service
 from app.providers.ollama_embeddings import OllamaProviderError
+from app.ui.spinner import thinking_spinner
+
+console = Console()
 
 
 def _print_help() -> None:
@@ -22,7 +26,8 @@ def chat_command(top_k: Optional[int] = None) -> None:
 
     while True:
         try:
-            user_input = typer.prompt("you")
+            console.print("[bold blue]you[/bold blue]", end=" ")
+            user_input = typer.prompt("")
         except (EOFError, KeyboardInterrupt):
             typer.echo("\nbye")
             break
@@ -51,7 +56,8 @@ def chat_command(top_k: Optional[int] = None) -> None:
             continue
 
         try:
-            result = service.answer_question(question=question, top_k=session_top_k)
+            with thinking_spinner("generating answer..."):
+                result = service.answer_question(question=question, top_k=session_top_k)
         except OllamaProviderError as exc:
             typer.echo(f"error: Ollama unavailable: {exc}")
             continue
@@ -59,18 +65,18 @@ def chat_command(top_k: Optional[int] = None) -> None:
             typer.echo(f"error: ask failed: {exc}")
             continue
 
-        typer.echo("\nassistant:")
-        typer.echo(result.answer)
+        console.print("\n[bold magenta]assistant[/bold magenta]")
+        console.print(result.answer)
         if result.sources:
-            typer.echo("sources:")
+            console.print("[dim]sources:[/dim]")
             shown = set()
             for source in result.sources:
                 source_label = source.file_name or source.source_path or source.document_id
                 if source_label in shown:
                     continue
                 shown.add(source_label)
-                typer.echo(f"- {source_label}")
+                console.print(f"[dim]- {source_label}[/dim]")
         else:
-            typer.echo("sources: none")
-        typer.echo("")
+            console.print("[dim]sources: none[/dim]")
+        console.print()
 
