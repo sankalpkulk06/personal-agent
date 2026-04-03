@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.core.qa_service import QAResult
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages
-from app.retrieval.retriever import Retriever
+from app.retrieval.retriever import Retriever, RetrievalResult
 from app.storage.sqlite_registry import SQLiteRegistry
 
 
@@ -73,7 +73,7 @@ class ChatService:
         if self._is_conversational(question):
             chunks = []
             sources = []
-            retrieval = None
+            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
         else:
             retrieval = self._retriever.retrieve(question=question, top_k=top_k)
             chunks = retrieval.chunks
