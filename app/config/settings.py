@@ -12,6 +12,7 @@ from app.config.paths import AppPaths, build_paths
 class Settings(BaseModel):
     app_name: str = "Personal RAG Study Agent"
     app_env: str = "development"
+    assistant_name: str = "Sanky"
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "llama3.2:3b"

@@ -53,7 +53,12 @@ def create_chat_service() -> ChatService:
         model=settings.ollama_chat_model,
     )
     registry = SQLiteRegistry(paths.sqlite_db_path)
-    return ChatService(retriever=retriever, chat_provider=chat_provider, registry=registry)
+    return ChatService(
+        retriever=retriever,
+        chat_provider=chat_provider,
+        registry=registry,
+        assistant_name=settings.assistant_name,
+    )
 
 
 def ask_command(
