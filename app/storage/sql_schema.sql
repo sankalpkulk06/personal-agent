@@ -35,3 +35,21 @@ CREATE INDEX IF NOT EXISTS idx_documents_source_path ON documents (source_path);
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks (document_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_document_index ON chunks (document_id, chunk_index);
 
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    session_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS chat_turns (
+    turn_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES chat_sessions (session_id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    turn_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_turns_session ON chat_turns (session_id, turn_index);
+

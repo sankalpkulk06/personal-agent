@@ -129,6 +129,41 @@ class SQLiteRegistry:
         ).fetchall()
         return [self._row_to_dict(row) for row in rows if row is not None]
 
+    def create_session(self, session_id: str, title: str = "") -> None:
+        self._connection.execute(
+            "INSERT OR IGNORE INTO chat_sessions (session_id, title) VALUES (?, ?)",
+            (session_id, title),
+        )
+        self._connection.commit()
+
+    def append_turn(self, session_id: str, turn_id: str, role: str, content: str, turn_index: int) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO chat_turns (turn_id, session_id, role, content, turn_index)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (turn_id, session_id, role, content, turn_index),
+        )
+        self._connection.execute(
+            "UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE session_id = ?",
+            (session_id,),
+        )
+        self._connection.commit()
+
+    def get_session_turns(self, session_id: str) -> List[Dict[str, object]]:
+        rows = self._connection.execute(
+            "SELECT turn_id, session_id, role, content, turn_index, created_at FROM chat_turns WHERE session_id = ? ORDER BY turn_index ASC",
+            (session_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_sessions(self, limit: int = 20) -> List[Dict[str, object]]:
+        rows = self._connection.execute(
+            "SELECT session_id, title, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     @staticmethod
     def _row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, object]]:
         if row is None:

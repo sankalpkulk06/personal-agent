@@ -64,5 +64,6 @@ def ask(
 @cli.command("chat")
 def chat(
     top_k: Optional[int] = typer.Option(None, "--top-k", help="Default retrieval depth for chat session."),
+    resume: Optional[str] = typer.Option(None, "--resume", help="Resume a previous chat session by ID."),
 ) -> None:
-    chat_command(top_k=top_k)
+    chat_command(top_k=top_k, session_id=resume)

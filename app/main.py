@@ -13,8 +13,12 @@ def run_sanky() -> None:
     if len(sys.argv) == 1:
         # No arguments: launch chat mode
         chat_command()
+    elif len(sys.argv) == 3 and sys.argv[1] == "--resume":
+        # Special case: sanky --resume <session_id>
+        session_id = sys.argv[2]
+        chat_command(session_id=session_id)
     else:
-        # With arguments: use normal CLI
+        # With other arguments: use normal CLI
         cli()
 
 

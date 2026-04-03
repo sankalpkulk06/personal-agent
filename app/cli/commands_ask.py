@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 
 from app.config import get_settings
+from app.core.chat_service import ChatService
 from app.core.qa_service import QAService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
@@ -33,6 +34,26 @@ def create_qa_service() -> QAService:
         model=settings.ollama_chat_model,
     )
     return QAService(retriever=retriever, chat_provider=chat_provider)
+
+
+def create_chat_service() -> ChatService:
+    settings = get_settings()
+    paths = settings.resolve_paths()
+    retriever = Retriever(
+        embeddings_provider=OllamaEmbeddingsProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_embedding_model,
+        ),
+        vector_store=ChromaStore(paths.chroma_dir),
+        metadata_registry=SQLiteRegistry(paths.sqlite_db_path),
+        default_top_k=settings.retrieval_top_k,
+    )
+    chat_provider = OllamaChatProvider(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_chat_model,
+    )
+    registry = SQLiteRegistry(paths.sqlite_db_path)
+    return ChatService(retriever=retriever, chat_provider=chat_provider, registry=registry)
 
 
 def ask_command(
