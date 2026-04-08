@@ -37,6 +37,7 @@ def build_chat_messages(
     history: List[dict[str, Any]],
     max_chunks: int = 5,
     assistant_name: str = "Sanky",
+    learned_facts: List[dict[str, Any]] = None,
 ) -> List[dict[str, Any]]:
     """Build a messages list for /api/chat endpoint with conversation history.
 
@@ -46,6 +47,7 @@ def build_chat_messages(
         history: Prior conversation turns, each a dict with "role" and "content"
         max_chunks: Max context chunks to include
         assistant_name: Name of the assistant for personality
+        learned_facts: Optional list of learned facts to inject
 
     Returns:
         A list of message dicts for the /api/chat endpoint
@@ -75,6 +77,10 @@ def build_chat_messages(
         "- Never robotically refuse — just be honest if you don't know something.\n"
         "- Use humor when it fits. You're a companion, not a search engine."
     )
+
+    if learned_facts:
+        facts_block = "\n".join([f"- {fact['content']}" for fact in learned_facts])
+        system_message += f"\n\nAbout the user (what I know):\n{facts_block}"
 
     if context_block:
         system_message += f"\n\nRelevant documents:\n{context_block}"

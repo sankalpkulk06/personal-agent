@@ -53,3 +53,17 @@ CREATE TABLE IF NOT EXISTS chat_turns (
 
 CREATE INDEX IF NOT EXISTS idx_chat_turns_session ON chat_turns (session_id, turn_index);
 
+CREATE TABLE IF NOT EXISTS learned_facts (
+    fact_id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    category TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'user',
+    confidence_score REAL NOT NULL DEFAULT 1.0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TEXT,
+    usage_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_learned_facts_category ON learned_facts (category);
+CREATE INDEX IF NOT EXISTS idx_learned_facts_created ON learned_facts (created_at);
+

@@ -164,6 +164,50 @@ class SQLiteRegistry:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def insert_fact(self, fact_id: str, content: str, category: str, source: str = "user", confidence_score: float = 1.0) -> None:
+        self._connection.execute(
+            """
+            INSERT OR REPLACE INTO learned_facts
+            (fact_id, content, category, source, confidence_score)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (fact_id, content, category, source, confidence_score),
+        )
+        self._connection.commit()
+
+    def list_facts(self, category: Optional[str] = None) -> List[Dict[str, object]]:
+        if category:
+            rows = self._connection.execute(
+                "SELECT fact_id, content, category, source, confidence_score, created_at, usage_count FROM learned_facts WHERE category = ? ORDER BY created_at DESC",
+                (category,),
+            ).fetchall()
+        else:
+            rows = self._connection.execute(
+                "SELECT fact_id, content, category, source, confidence_score, created_at, usage_count FROM learned_facts ORDER BY created_at DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_fact(self, fact_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM learned_facts WHERE fact_id = ?",
+            (fact_id,),
+        )
+        self._connection.commit()
+
+    def get_fact(self, fact_id: str) -> Optional[Dict[str, object]]:
+        row = self._connection.execute(
+            "SELECT fact_id, content, category, source, confidence_score, created_at, usage_count FROM learned_facts WHERE fact_id = ?",
+            (fact_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def increment_fact_usage(self, fact_id: str) -> None:
+        self._connection.execute(
+            "UPDATE learned_facts SET usage_count = usage_count + 1, last_used_at = CURRENT_TIMESTAMP WHERE fact_id = ?",
+            (fact_id,),
+        )
+        self._connection.commit()
+
     @staticmethod
     def _row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, object]]:
         if row is None:

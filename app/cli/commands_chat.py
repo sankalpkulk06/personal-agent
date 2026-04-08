@@ -17,12 +17,17 @@ def _print_help() -> None:
     typer.echo("- /topk <n> : set retrieval depth for this chat session")
     typer.echo("- /session : show current session ID")
     typer.echo("- /sessions : list recent chat sessions")
+    typer.echo("- /remember-personal <fact> : remember a personal fact")
+    typer.echo("- /remember-work <fact> : remember a work fact")
+    typer.echo("- /facts [personal|work] : list learned facts (optionally by category)")
+    typer.echo("- /forget <fact-id> : forget a learned fact")
     typer.echo("- exit | quit : leave chat mode")
 
 
 def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) -> None:
     """Run an interactive chat session with conversation history."""
     service = create_chat_service()
+    fact_service = service.get_fact_service()
     session_top_k = top_k
 
     if session_id is None:
@@ -78,6 +83,44 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 typer.echo(f"top_k set to {session_top_k}")
             except ValueError:
                 typer.echo("Invalid /topk value. Example: /topk 3")
+            continue
+        if lowered.startswith("/remember-personal "):
+            fact_text = question[len("/remember-personal "):].strip()
+            if fact_text:
+                fact_service.remember(content=fact_text, category="personal")
+                typer.echo(f"✓ Remembered (personal): {fact_text}")
+            else:
+                typer.echo("Usage: /remember-personal <fact>")
+            continue
+        if lowered.startswith("/remember-work "):
+            fact_text = question[len("/remember-work "):].strip()
+            if fact_text:
+                fact_service.remember(content=fact_text, category="work")
+                typer.echo(f"✓ Remembered (work): {fact_text}")
+            else:
+                typer.echo("Usage: /remember-work <fact>")
+            continue
+        if lowered.startswith("/facts"):
+            parts = lowered.split()
+            category = parts[1] if len(parts) > 1 else None
+            facts = fact_service.list_facts(category=category)
+            if facts:
+                cat_label = f" ({category})" if category else ""
+                console.print(f"[bold]Learned facts{cat_label}:[/bold]")
+                for i, fact in enumerate(facts[:20], 1):
+                    fact_id = fact["fact_id"][:8]
+                    console.print(f"  [{i}] {fact['content']}")
+                    console.print(f"      [dim]{fact_id}... | {fact['created_at'][:10]}[/dim]")
+            else:
+                typer.echo("No facts learned yet.")
+            continue
+        if lowered.startswith("/forget "):
+            fact_id = question[len("/forget "):].strip()
+            try:
+                fact_service.forget(fact_id)
+                typer.echo(f"✓ Forgotten.")
+            except Exception as e:
+                typer.echo(f"Error: {e}")
             continue
 
         try:

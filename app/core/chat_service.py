@@ -3,6 +3,7 @@ import uuid
 from typing import List, Optional
 
 from app.core.qa_service import QAResult
+from app.core.fact_service import FactService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages
 from app.retrieval.retriever import Retriever, RetrievalResult
@@ -31,12 +32,14 @@ class ChatService:
         retriever: Retriever,
         chat_provider: OllamaChatProvider,
         registry: SQLiteRegistry,
+        fact_service: Optional[FactService] = None,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sanky",
     ):
         self._retriever = retriever
         self._chat_provider = chat_provider
         self._registry = registry
+        self._fact_service = fact_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
 
@@ -79,12 +82,21 @@ class ChatService:
             chunks = retrieval.chunks
             sources = retrieval.chunks
 
+        learned_facts_list = []
+        if self._fact_service:
+            personal_facts = self._fact_service.get_relevant_facts("personal", limit=3)
+            work_facts = self._fact_service.get_relevant_facts("work", limit=3)
+            learned_facts_list = [
+                {"content": f.content} for f in (personal_facts + work_facts)
+            ]
+
         messages = build_chat_messages(
             question=question,
             chunks=chunks,
             history=history,
             max_chunks=self._max_prompt_chunks,
             assistant_name=self._assistant_name,
+            learned_facts=learned_facts_list if learned_facts_list else None,
         )
 
         answer = self._chat_provider.chat(messages=messages)
@@ -148,3 +160,7 @@ class ChatService:
         """
         turns = self._registry.get_session_turns(session_id)
         return [{"role": turn["role"], "content": turn["content"]} for turn in turns]
+
+    def get_fact_service(self) -> Optional[FactService]:
+        """Get the fact service for external use."""
+        return self._fact_service
