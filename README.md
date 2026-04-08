@@ -1,6 +1,6 @@
 # Sage - Personal Agent
 
-A **local-first, privacy-respecting personal AI assistant** that combines retrieval-augmented generation (RAG) with persistent memory, live news, and intelligent conversation. Sanky is your personal study companion with personality—answering questions about your documents, remembering what you tell it, fetching live news, and maintaining full conversation context.
+A **local-first, privacy-respecting personal AI assistant** that combines retrieval-augmented generation (RAG) with persistent memory, live news, and intelligent conversation. Sage is your personal study companion with personality—answering questions about your documents, remembering what you tell it, fetching live news, and maintaining full conversation context.
 
 **No cloud. No tracking. Everything stays on your machine.**
 
@@ -48,10 +48,10 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Citation system** — all answers cite exact document sources
 
 ### **7. Personality-Driven Responses** 🎭
-- **Named assistant** — "You are Sanky — a sharp, witty personal study companion"
+- **Named assistant** — "You are Sage — a wise, knowledgeable personal companion"
 - **Natural tone** — conversational, not robotic
 - **Context-aware** — different response style for personal facts vs. document answers
-- **Humor** — maintains personality while staying helpful
+- **Thoughtful advice** — like a trusted advisor, not a search engine
 
 ### **8. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
@@ -261,7 +261,7 @@ RETRIEVAL_TOP_K=5
 NEWS_MAX_RESULTS=5
 
 # Personality
-ASSISTANT_NAME=Sanky
+ASSISTANT_NAME=Sage
 
 # Storage
 DATA_DIR=./data
@@ -355,7 +355,7 @@ you : /remember-personal I have a dog named Max
 you : /remember-personal Max's birthday is July 15
 
 you : When is Max's birthday?
-# Sanky remembers from learned facts
+# Sage remembers from learned facts
 
 you : /facts personal
 # Lists all personal facts with dates
@@ -368,7 +368,7 @@ you : /remember-work I work on the payment system
 you : /remember-work My team has 4 people
 
 you : Tell me about payment systems in the book
-# Sanky knows you work on payments, includes in context
+# Sage knows you work on payments, includes in context
 ```
 
 ---
@@ -382,6 +382,7 @@ you : Tell me about payment systems in the book
 | **ChatService** | Manages sessions, routing, context injection |
 | **FactService** | Stores and retrieves learned facts |
 | **NewsService** | Fetches live news from Google News RSS |
+| **TodoService** | Adds tasks to macOS Reminders app |
 | **Retriever** | RAG retrieval with embeddings |
 | **OllamaChatProvider** | LLM interface to Ollama |
 | **SQLiteRegistry** | Persists sessions, facts, metadata |
@@ -472,7 +473,7 @@ RETRIEVAL_TOP_K=5           # Documents to retrieve
 NEWS_MAX_RESULTS=5          # News articles to fetch
 
 # Personality
-ASSISTANT_NAME=Sanky        # Your assistant's name
+ASSISTANT_NAME=Sage        # Your assistant's name
 APP_ENV=development
 
 # Storage
@@ -491,6 +492,7 @@ DATA_DIR=./data             # Where to store data
 - [x] Document management
 - [x] Conversation context
 - [x] Source citations
+- [x] Apple Reminders integration
 
 ### 🚀 Upcoming
 - [ ] Fact verification against documents
