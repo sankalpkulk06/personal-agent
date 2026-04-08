@@ -1,108 +1,628 @@
-# Personal RAG Study Agent
+# Sage - Personal Agent
 
-A local-first personal knowledge agent that understands your own documents and lets you ask questions about them securely.
+A **local-first, privacy-respecting personal AI assistant** that combines retrieval-augmented generation (RAG) with persistent memory, live news, and intelligent conversation. Sage is your personal study companion with personality—answering questions about your documents, remembering what you tell it, fetching live news, and maintaining full conversation context.
 
-## Vision
-
-The goal of this project is to build an agent that has access to **your local data only**, runs **fully on your machine**, and helps you interact with your personal knowledge in a natural way.
-
-Instead of uploading private files to a third-party service, this project is designed around a simple idea:
-
-**your data stays with you**
-
-This agent should make it possible to:
-
-- connect to your local documents
-- build context from your personal knowledge base
-- answer questions grounded in your own files
-- run securely on-device or in a local environment
-- give you a simple way to explore everything you already know
-
-## What this project aims to be
-
-This project is meant to become a **personal knowledge agent** that can understand and reason over:
-
-- notes
-- PDFs
-- markdown files
-- resumes
-- project documentation
-- research papers
-- class material
-- personal knowledge files
-
-You should be able to ask it questions like:
-
-- What did I write about RAG in my notes?
-- Summarize my distributed systems notes
-- Which of my documents mention pgvector?
-- What projects in my files involve embeddings or retrieval?
-- Explain a concept from my own study material
-
-## Core principles
-
-### 1. Local-first
-The system is designed to run locally so that your personal documents do not need to leave your machine.
-
-### 2. Secure by design
-Your files are private and should remain under your control. The agent should work with local data sources and local storage wherever possible.
-
-### 3. Grounded in your data
-This is not meant to be a generic chatbot. Its value comes from answering questions based on **your personal documents and context**.
-
-### 4. Useful and practical
-The project should solve real problems, such as searching notes, summarizing documents, connecting ideas across files, and helping with study or recall.
-
-### 5. Extensible
-The first version will be simple, but the system should be designed so it can later support richer agent workflows such as summarization, comparison, quiz generation, and multi-step reasoning over documents.
-
-## Long-term idea
-
-Over time, this project should evolve from a simple local RAG app into a true personal agent that can:
-
-- retrieve relevant context from your files
-- answer questions with source grounding
-- summarize and organize personal knowledge
-- compare multiple documents
-- help with studying and revision
-- act as a secure interface to your own data
-
-## Why this project matters
-
-There is a growing need for AI systems that are useful **without giving up privacy**.
-
-A lot of personal knowledge is scattered across documents, folders, notes, and project files. This agent is an attempt to create a secure local system that turns that data into something searchable, understandable, and interactive.
-
-The vision is simple:
-
-**a private agent for your personal data, running locally, with context from your own files, so you can ask it anything about what you already have.**
-
-## Initial scope
-
-The first version of this project will focus on:
-
-- ingesting local documents
-- building embeddings over document chunks
-- retrieving relevant context for a user query
-- answering questions based on personal files
-- keeping the workflow local and secure
-
-## Future directions
-
-Planned capabilities may include:
-
-- source-backed answers
-- document summarization
-- topic extraction
-- personal study assistant workflows
-- flashcard and quiz generation
-- document comparison
-- metadata-based filtering
-- lightweight agentic tool routing
-
-## Status
-
-This repository is the starting point for building a secure, local-first personal knowledge agent from scratch.
+**No cloud. No tracking. Everything stays on your machine.**
 
 ---
-Built with the idea that personal AI should be private, useful, and grounded in your own data.
+
+## ✨ Core Capabilities
+
+### **1. Smart Chat with Memory** 💬
+- **Persistent session history** — conversations are saved and can be resumed later
+- **Multi-turn context** — LLM remembers everything said in the session
+- **Resume any session** — `sage --resume <session-id>` to continue where you left off
+- **Session management** — list, view, and organize chat sessions
+
+### **2. Learned Facts** 🧠
+- **Remember personal facts** — `/remember-personal Your favorite hobby is reading`
+- **Remember work facts** — `/remember-work I lead the ML team`
+- **Smart categorization** — personal and work facts organized separately
+- **Automatic context** — facts are automatically injected into responses
+- **Manage facts** — view all facts, delete unwanted ones, organize by category
+
+### **3. Selective RAG Retrieval** 🎯
+- **Conversational questions** (greetings, meta-questions) — skip document retrieval entirely
+- **Document-based questions** — retrieve and cite sources only when needed
+- **Smart pattern detection** — knows when to use docs vs. just chat
+- **Fast responses** — no embedding latency for casual conversation
+
+### **4. Live News Fetching** 📰
+- **Natural language news queries** — "What is the news on NASA today?"
+- **Direct news command** — `/news SpaceX` for instant formatted news
+- **Topic extraction** — automatically extracts topics from questions
+- **Full sentence search** — `/news What happened with the Mars launch` works perfectly
+- **Persistent news context** — follow-up questions remember the articles
+- **Proper citations** — news sources cited separately from documents
+
+### **5. Apple Reminders Todos** ✅
+- **Quick todo capture** — `/todo Buy oat milk` adds a reminder from chat
+- **Natural language due dates** — `/todo Buy milk @tomorrow` or `/todo Call mom @next Tuesday at 3pm`
+- **Custom reminder lists** — `/todo Buy milk #Shopping` to add to specific lists
+- **Flexible date parsing** — supports relative dates, specific dates, and times
+- **Native macOS integration** — uses the built-in Reminders app through AppleScript
+- **Configurable target list** — choose a default list with `REMINDERS_DEFAULT_LIST`
+
+### **6. Document Management** 📚
+- **Multi-format support** — `.txt`, `.md`, `.pdf` files
+- **Bulk ingestion** — `sage ingest --path ./documents/`
+- **Metadata tracking** — file size, type, date, checksums
+- **Vector embeddings** — semantic search across all documents
+- **Citation system** — all answers cite exact document sources
+
+### **7. Personality-Driven Responses** 🎭
+- **Named assistant** — "You are Sage — a wise, knowledgeable personal companion"
+- **Natural tone** — conversational, not robotic
+- **Context-aware** — different response style for personal facts vs. document answers
+- **Thoughtful advice** — like a trusted advisor, not a search engine
+
+### **8. Configuration & Customization** ⚙️
+- **Environment variables** — all settings configurable via `.env`
+- **Custom assistant name** — change who you're talking to
+- **Retrieval depth** — adjust how many documents to retrieve (in-session)
+- **Chunk size & overlap** — fine-tune document chunking
+- **Max results** — control news result count
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.9+
+- Ollama installed and running
+- 2GB+ RAM available
+
+### Installation
+
+```bash
+git clone <repo-url>
+cd personal-agent
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Start Ollama
+
+```bash
+ollama serve
+```
+
+In another terminal, pull the models:
+
+```bash
+ollama pull nomic-embed-text      # Embeddings (small & fast)
+ollama pull llama3.2:3b           # Chat model (lightweight)
+```
+
+### First Steps
+
+```bash
+# Show configuration
+sage config
+
+# Ingest your documents
+sage ingest --path "./my-documents"
+
+# Start chatting!
+sage chat
+```
+
+---
+
+## 💬 Interactive Chat Mode
+
+### Starting Chat
+
+```bash
+# New session
+sage chat
+
+# Resume a previous session
+sage chat --resume <session-id>
+sage --resume <session-id>  # Shortcut
+```
+
+### Chat Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/help` | Show all commands |
+| `/session` | Display current session ID |
+| `/sessions` | List recent chat sessions |
+| `/topk <n>` | Set retrieval depth for this session |
+| `/remember-personal <fact>` | Save a personal fact |
+| `/remember-work <fact>` | Save a work fact |
+| `/facts [personal\|work]` | List learned facts |
+| `/forget <fact-id>` | Delete a fact |
+| `/news [query]` | Fetch live news |
+| `/todo <task> [#list] [@due]` | Add a task to Apple Reminders (with optional list & date/time) |
+| `exit` or `quit` | Exit chat |
+
+### Usage Examples
+
+**Learn about yourself:**
+```
+you : /remember-personal I live in NYC
+✓ Personal fact saved: I live in NYC
+
+you : /remember-work I'm a software engineer
+✓ Work fact saved: I'm a software engineer
+
+you : where do I live?
+assistant
+You live in NYC.
+```
+
+**Chat with persistence:**
+```
+you : What is the news on SpaceX today?
+# Fetches live articles, injects into context
+
+you : where was it launched from?
+assistant
+According to the latest news [1], SpaceX launched from...
+news sources:
+- [1] SpaceX launches Falcon 9... — Reuters
+
+you : /sessions
+# Resume this session later!
+```
+
+**Search documents:**
+```
+you : what did I write about machine learning?
+assistant
+According to your notes [1], machine learning is...
+document sources:
+- [1] machine-learning-notes.md
+```
+
+**Capture a todo in Apple Reminders:**
+```
+you : /todo Buy oat milk
+✓ Added todo to Reminders: Buy oat milk
+
+you : /todo Buy groceries #Shopping
+✓ Added todo to Shopping: Buy groceries
+
+you : /todo Buy organic items #Shopping List
+✓ Added todo to Shopping List: Buy organic items
+
+you : /todo Call mom @tomorrow
+✓ Added todo to Reminders: Call mom due Wed, Apr 08 at 12:00AM
+
+you : /todo Pay rent #Bills @next 1st
+✓ Added todo to Bills: Pay rent due Thu, May 01 at 12:00AM
+
+you : /todo Email tax documents @April 8th at 3pm #Todo
+✓ Added todo to Todo: Email tax documents due Wed, Apr 08 at 03:00PM
+
+you : /todo Meeting #Work @next Tuesday at 3pm
+✓ Added todo to Work: Meeting due Tue, Apr 15 at 03:00PM
+
+you : /todo Planning #Work Projects @next Friday at 10am
+✓ Added todo to Work Projects: Planning due Fri, Apr 11 at 10:00AM
+```
+
+**Manage facts:**
+```
+you : /facts work
+[1] I'm a software engineer
+    a1b2c3d4... | 2026-04-07
+
+[2] I lead the ML team
+    b2c3d4e5... | 2026-04-06
+
+you : /forget a1b2c3d4
+✓ Fact forgotten
+```
+
+---
+
+## 🛠️ CLI Commands
+
+### Configuration
+
+```bash
+sage config
+# Output: Shows all current settings
+```
+
+### Document Ingestion
+
+```bash
+# Ingest a single file
+sage ingest --path "./document.pdf"
+
+# Ingest entire directory
+sage ingest --path "./documents/"
+
+# Both .md, .txt, .pdf are supported
+```
+
+### Single Question Mode
+
+```bash
+# Ask a question and exit
+sage ask "What are the key concepts in distributed systems?"
+
+# Override retrieval depth
+sage ask "Summarize my notes" --top-k 10
+
+# Export answer to Markdown
+sage ask "What did I learn?" --export
+```
+
+### Interactive Chat
+
+```bash
+sage chat                    # New session
+sage chat --top-k 7          # Custom retrieval depth
+sage chat --resume <id>      # Resume session
+sage --resume <id>           # Quick resume
+```
+
+### Todo with Natural Language Dates and Custom Lists
+
+In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates and custom lists:
+
+```bash
+# Basic task
+/todo Buy milk
+
+# Add to specific Reminders list
+/todo Buy groceries #Shopping
+/todo Pay utilities #Bills
+/todo Review PR #Work
+
+# Lists with spaces in names
+/todo Buy organic items #Shopping List
+/todo Pay rent #Bills and Expenses
+/todo Sprint planning #Work Projects
+
+# Add with due date
+/todo Call mom @tomorrow
+/todo Meeting @next Tuesday at 3pm
+/todo Workout @3pm
+
+# Combine list and due date
+/todo Dinner prep #Personal @6pm
+/todo Project deadline #Work @next Friday
+/todo Anniversary #Important Dates @April 15
+```
+
+**List syntax:** Use `#ListName` to specify which Reminders list to add to. List names can include spaces (e.g., `#Shopping List`, `#Bills and Expenses`). If omitted, uses `REMINDERS_DEFAULT_LIST` (default: "Reminders").
+
+**Date patterns:**
+- **Relative:** today, tomorrow, tonight, next Monday, next week, etc.
+- **Specific dates:** April 15, 2026-04-20, April 15 at 9am
+- **Times:** 3pm, 9:30am, 14:45, etc.
+- **Combinations:** next Tuesday at 3pm, April 20 at 6:30pm
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables (`.env`)
+
+```env
+# Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=llama3.2:3b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+REMINDERS_DEFAULT_LIST=Reminders
+
+# Chunking
+CHUNK_SIZE=800
+CHUNK_OVERLAP=120
+
+# Retrieval
+RETRIEVAL_TOP_K=5
+NEWS_MAX_RESULTS=5
+
+# Personality
+ASSISTANT_NAME=Sage
+
+# Storage
+DATA_DIR=./data
+```
+
+### Recommended Ollama Models
+
+**For speed (lightweight):**
+```bash
+ollama pull nomic-embed-text      # 274MB — fast embeddings
+ollama pull mistral:7b            # Fast chat
+```
+
+**For quality (larger):**
+```bash
+ollama pull llama2:13b            # Better reasoning
+ollama pull all-minilm:22m        # Better embeddings
+```
+
+---
+
+## 📊 How It Works
+
+### Conversation Flow
+
+```
+User Input
+    ↓
+Pattern Detection
+    ├─ Conversational? (greeting, meta-question)
+    │  └→ No RAG retrieval, just chat
+    ├─ News query? ("news on X", "what happened to Y")
+    │  └→ Fetch live news, inject context
+    ├─ Has cached news context?
+    │  └→ Re-inject articles, continue conversation
+    └─ Document question?
+       └→ RAG retrieval, cite sources
+    ↓
+Inject Context
+    ├─ Learned facts (personal + work)
+    ├─ Retrieved documents (if applicable)
+    ├─ Live news articles (if applicable)
+    └─ Conversation history
+    ↓
+LLM Response (Ollama)
+    ↓
+Display with Citations
+    ├─ News sources (📰)
+    └─ Document sources (📄)
+    ↓
+Save to Session
+```
+
+### Session Persistence
+
+```
+Session created → Turns stored in SQLite
+├─ Turn 1: User question
+├─ Turn 2: Assistant answer
+├─ Turn 3: User follow-up
+└─ ...
+    ↓
+Later: Resume session
+├─ Load all turns
+├─ Re-inject context
+└─ Continue conversation
+```
+
+---
+
+## 🎯 Real-World Examples
+
+### Scenario 1: Research with Follow-ups
+
+```
+you : What is the news on climate change today?
+# Fetches 5 articles about climate change
+
+you : What are the main solutions mentioned?
+# Re-uses cached articles, LLM answers in context
+
+you : Tell me about renewable energy
+# Switches to document search (new topic)
+# Clears news cache, does RAG
+```
+
+### Scenario 2: Personal Knowledge Base
+
+```
+you : /remember-personal I have a dog named Max
+you : /remember-personal Max's birthday is July 15
+
+you : When is Max's birthday?
+# Sage remembers from learned facts
+
+you : /facts personal
+# Lists all personal facts with dates
+```
+
+### Scenario 3: Work Context
+
+```
+you : /remember-work I work on the payment system
+you : /remember-work My team has 4 people
+
+you : Tell me about payment systems in the book
+# Sage knows you work on payments, includes in context
+```
+
+---
+
+## 📈 Architecture
+
+### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| **ChatService** | Manages sessions, routing, context injection |
+| **FactService** | Stores and retrieves learned facts |
+| **NewsService** | Fetches live news from Google News RSS |
+| **TodoService** | Adds tasks to macOS Reminders app |
+| **Retriever** | RAG retrieval with embeddings |
+| **OllamaChatProvider** | LLM interface to Ollama |
+| **SQLiteRegistry** | Persists sessions, facts, metadata |
+| **ChromaStore** | Vector database for embeddings |
+
+### Data Storage
+
+```
+data/
+├── sqlite/registry.db         # Sessions, facts, metadata
+├── chroma/                    # Vector embeddings
+└── cache/                     # Temporary files
+```
+
+---
+
+## 🚀 Performance
+
+### Typical Response Times
+
+| Query Type | Time | Notes |
+|-----------|------|-------|
+| Conversational | <100ms | No RAG overhead |
+| News query | 2-3s | Web fetch + LLM |
+| Document search | 1-2s | Embedding + retrieval + LLM |
+| Follow-up (cached news) | 1-2s | Uses cached articles |
+
+### Memory Usage
+
+- **Base system**: ~300MB
+- **With 1 model loaded**: ~800MB
+- **With large documents**: +500MB per 100MB docs
+
+---
+
+## 🔧 Troubleshooting
+
+### Ollama not connecting
+
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/version
+
+# Start Ollama if not running
+ollama serve
+```
+
+### No embeddings error
+
+```bash
+# Ensure embedding model is pulled
+ollama pull nomic-embed-text
+
+# Check it's available
+ollama list
+```
+
+### Out of memory
+
+- Use smaller model: `mistral:7b` instead of `llama2:13b`
+- Reduce `CHUNK_SIZE` in `.env`
+- Free up system RAM
+
+### Chat feels slow
+
+- Reduce `RETRIEVAL_TOP_K` in `.env` (default: 5)
+- Use `/topk 3` in chat to retrieve fewer documents
+- Switch to faster model in Ollama
+
+---
+
+## 📚 Settings Reference
+
+### Environment Variables
+
+```env
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=llama3.2:3b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Document Chunking
+CHUNK_SIZE=800              # Characters per chunk
+CHUNK_OVERLAP=120           # Overlap between chunks
+
+# Retrieval
+RETRIEVAL_TOP_K=5           # Documents to retrieve
+NEWS_MAX_RESULTS=5          # News articles to fetch
+
+# Reminders (macOS)
+REMINDERS_DEFAULT_LIST=Reminders  # Default Reminders list for /todo
+
+# Personality
+ASSISTANT_NAME=Sage        # Your assistant's name
+APP_ENV=development
+
+# Storage
+DATA_DIR=./data             # Where to store data
+```
+
+---
+
+## 🎯 Features Roadmap
+
+### ✅ Completed
+- [x] Chat with session history
+- [x] Learned facts (personal/work)
+- [x] Live news fetching
+- [x] Selective RAG routing
+- [x] Document management
+- [x] Conversation context
+- [x] Source citations
+- [x] Apple Reminders integration
+
+### 🚀 Upcoming
+- [ ] Fact verification against documents
+- [ ] Automatic fact extraction from responses
+- [ ] Semantic fact linking & inference
+- [ ] Chat history search
+- [ ] Web API server mode
+- [ ] Dashboard UI
+- [ ] Batch processing
+- [ ] Multi-user support
+
+---
+
+## 💡 Tips & Tricks
+
+### Optimize for Your Use Case
+
+**For research:**
+```bash
+sage config
+# Increase RETRIEVAL_TOP_K to 10 in .env
+sage chat --top-k 10
+```
+
+**For quick answers:**
+```bash
+# Use single question mode
+sage ask "Quick answer?"
+```
+
+**For casual chat:**
+```bash
+# Session mode remembers everything
+sage chat
+sage --resume <id>
+```
+
+### Best Practices
+
+- **Regular ingestion** — keep your documents up to date
+- **Organized facts** — use `/remember-personal` and `/remember-work` to keep knowledge organized
+- **Session management** — `/sessions` to find relevant past conversations
+- **Topic switching** — start a new session for different topics
+- **Fact cleanup** — use `/forget` to remove outdated facts
+
+---
+
+## 📝 License
+
+[Add your license here]
+
+---
+
+## 🙋 Contributing
+
+[Add contribution guidelines]
+
+---
+
+## 📧 Support
+
+For issues, feature requests, or questions:
+- Check the [Troubleshooting](#-troubleshooting) section
+- Review existing settings in `.env`
+- Ensure Ollama is running and models are pulled
+
+---
+
+**Made with ❤️ for your personal knowledge base.**

@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+chromadb
+pypdf
+python-docx
+python-multipart
+pydantic
+pydantic-settings
+typer
+requests
+python-dotenv
+pytest
+httpx
+rich
+prompt_toolkit
+python-dateutil

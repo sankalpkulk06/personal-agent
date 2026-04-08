@@ -1,0 +1,60 @@
+import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional
+
+from dotenv import dotenv_values
+from pydantic import BaseModel, Field, model_validator
+
+from app.config.paths import AppPaths, build_paths
+
+
+class Settings(BaseModel):
+    app_name: str = "Sage — Personal RAG Agent"
+    app_env: str = "development"
+    assistant_name: str = "Sage"
+
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_chat_model: str = "llama3.2:3b"
+    ollama_embedding_model: str = "nomic-embed-text"
+
+    chunk_size: int = Field(default=800, gt=0)
+    chunk_overlap: int = Field(default=120, ge=0)
+    retrieval_top_k: int = Field(default=5, gt=0)
+    news_max_results: int = Field(default=5, gt=0)
+    reminders_default_list: str = "Reminders"
+
+    data_dir: Optional[Path] = None
+
+    @model_validator(mode="after")
+    def validate_chunking(self) -> "Settings":
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
+        return self
+
+    @classmethod
+    def from_env(cls, project_root: Optional[Path] = None) -> "Settings":
+        root = (project_root or Path(__file__).resolve().parents[2]).resolve()
+        env_file = root / ".env"
+
+        values: dict[str, str] = {}
+        dotenv_map = dotenv_values(env_file) if env_file.exists() else {}
+
+        for field_name in cls.model_fields:
+            env_key = field_name.upper()
+            dotenv_value = dotenv_map.get(env_key)
+            if dotenv_value is not None:
+                values[field_name] = dotenv_value
+            if env_key in os.environ:
+                values[field_name] = os.environ[env_key]
+
+        return cls.model_validate(values)
+
+    def resolve_paths(self, project_root: Optional[Path] = None) -> AppPaths:
+        root = (project_root or Path(__file__).resolve().parents[2]).resolve()
+        return build_paths(project_root=root, data_dir=self.data_dir)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings.from_env()
