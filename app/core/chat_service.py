@@ -55,6 +55,8 @@ class ChatService:
         self._news_service = news_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
+        # In-memory cache of news articles per session for follow-up questions
+        self._session_news: dict[str, list[dict]] = {}
 
     @staticmethod
     def _is_conversational(question: str) -> bool:
@@ -129,19 +131,43 @@ class ChatService:
         history = self.get_history(session_id)
 
         news_articles: List[NewsArticle] = []
+        cached_news_articles: list[dict] = self._session_news.get(session_id, [])
+
         if self._is_conversational(question):
+            # Conversational: no retrieval needed
             chunks = []
             sources = []
             retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
         elif self._is_news_query(question) and self._news_service:
-            # News query: fetch live news
+            # News query: fetch fresh news articles
             topic = self._extract_news_topic(question)
             news_articles = self._news_service.search_news(topic) if topic else self._news_service.get_top_news()
+            # Cache articles for follow-ups
+            self._session_news[session_id] = [
+                {
+                    "title": a.title,
+                    "source": a.source,
+                    "url": a.url,
+                    "published": a.published,
+                }
+                for a in news_articles
+            ]
+            chunks = []
+            sources = []
+            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
+        elif cached_news_articles:
+            # Follow-up to news query: re-inject cached articles
+            # Convert back to NewsArticle objects for consistency
+            news_articles = [
+                NewsArticle(**article) for article in cached_news_articles
+            ]
             chunks = []
             sources = []
             retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
         else:
             # Document query: retrieve from knowledge base
+            # Clear news context when switching topics
+            self._session_news.pop(session_id, None)
             retrieval = self._retriever.retrieve(question=question, top_k=top_k)
             chunks = retrieval.chunks
             sources = retrieval.chunks
