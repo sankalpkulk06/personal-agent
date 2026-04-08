@@ -75,13 +75,16 @@ def create_chat_service() -> ChatService:
     registry = SQLiteRegistry(paths.sqlite_db_path)
     fact_service = create_fact_service()
     news_service = create_news_service()
+    reminders_service = create_reminders_service()
     return ChatService(
         retriever=retriever,
         chat_provider=chat_provider,
         registry=registry,
         fact_service=fact_service,
         news_service=news_service,
+        reminders_service=reminders_service,
         assistant_name=settings.assistant_name,
+        enable_tools=True,
     )
 
 

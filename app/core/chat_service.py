@@ -5,8 +5,11 @@ from typing import List, Optional
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
 from app.core.news_service import NewsService, NewsArticle
+from app.core.reminders_service import RemindersService
+from app.core.tool_executor import ToolExecutor
+from app.core.tools import ToolRegistry
 from app.providers.ollama_chat import OllamaChatProvider
-from app.retrieval.prompt_builder import build_chat_messages
+from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
 from app.retrieval.retriever import Retriever, RetrievalResult
 from app.storage.sqlite_registry import SQLiteRegistry
 
@@ -45,16 +48,30 @@ class ChatService:
         registry: SQLiteRegistry,
         fact_service: Optional[FactService] = None,
         news_service: Optional[NewsService] = None,
+        reminders_service: Optional[RemindersService] = None,
         max_prompt_chunks: int = 5,
-        assistant_name: str = "Sanky",
+        assistant_name: str = "Sage",
+        enable_tools: bool = True,
     ):
         self._retriever = retriever
         self._chat_provider = chat_provider
         self._registry = registry
         self._fact_service = fact_service
         self._news_service = news_service
+        self._reminders_service = reminders_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
+        self._enable_tools = enable_tools
+
+        # Tool registry and executor for open source model
+        self._tool_registry = ToolRegistry(
+            news_service=news_service,
+            fact_service=fact_service,
+            reminders_service=reminders_service,
+            retriever=retriever,
+        )
+        self._tool_executor = ToolExecutor(self._tool_registry)
+
         # In-memory cache of news articles per session for follow-up questions
         self._session_news: dict[str, list[dict]] = {}
 
@@ -117,8 +134,9 @@ class ChatService:
     ) -> QAResult:
         """Answer a question within a chat session with full conversation history.
 
-        Automatically skips document retrieval for conversational messages (greetings,
-        meta-questions) to keep responses fast and natural.
+        Uses tool calling if enabled, allowing the model to call tools (news, todos, etc.)
+        based on natural language understanding. Falls back to document retrieval for
+        research questions.
 
         Args:
             session_id: The chat session ID
@@ -130,78 +148,88 @@ class ChatService:
         """
         history = self.get_history(session_id)
 
-        news_articles: List[NewsArticle] = []
-        cached_news_articles: list[dict] = self._session_news.get(session_id, [])
-
-        if self._is_conversational(question):
-            # Conversational: no retrieval needed
-            chunks = []
-            sources = []
-            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
-        elif self._is_news_query(question) and self._news_service:
-            # News query: fetch fresh news articles
-            topic = self._extract_news_topic(question)
-            news_articles = self._news_service.search_news(topic) if topic else self._news_service.get_top_news()
-            # Cache articles for follow-ups
-            self._session_news[session_id] = [
-                {
-                    "title": a.title,
-                    "source": a.source,
-                    "url": a.url,
-                    "published": a.published,
-                }
-                for a in news_articles
-            ]
-            chunks = []
-            sources = []
-            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
-        elif cached_news_articles:
-            # Follow-up to news query: re-inject cached articles
-            # Convert back to NewsArticle objects for consistency
-            news_articles = [
-                NewsArticle(**article) for article in cached_news_articles
-            ]
-            chunks = []
-            sources = []
-            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
+        # Build messages with tool-aware system prompt
+        if self._enable_tools:
+            tool_schemas = self._tool_registry.to_schemas()
+            system_message = build_system_message_with_tools(
+                assistant_name=self._assistant_name,
+                tools_schemas=tool_schemas,
+            )
         else:
-            # Document query: retrieve from knowledge base
-            # Clear news context when switching topics
-            self._session_news.pop(session_id, None)
-            retrieval = self._retriever.retrieve(question=question, top_k=top_k)
-            chunks = retrieval.chunks
-            sources = retrieval.chunks
+            system_message = (
+                f"You are {self._assistant_name} — a wise, knowledgeable personal companion.\n"
+                "Be thoughtful, direct, and helpful."
+            )
 
-        learned_facts_list = []
-        if self._fact_service:
-            personal_facts = self._fact_service.get_relevant_facts("personal", limit=3)
-            work_facts = self._fact_service.get_relevant_facts("work", limit=3)
-            learned_facts_list = [
-                {"content": f.content} for f in (personal_facts + work_facts)
-            ]
+        messages = [{"role": "system", "content": system_message}]
+        messages.extend(history)
+        messages.append({"role": "user", "content": question})
 
-        news_articles_list = [
-            {
-                "title": article.title,
-                "source": article.source,
-                "url": article.url,
-                "published": article.published,
-            }
-            for article in news_articles
-        ]
+        # Tool-calling loop
+        answer = ""
+        news_articles: List[NewsArticle] = []
+        chunks = []
+        sources = []
+        retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
 
-        messages = build_chat_messages(
-            question=question,
-            chunks=chunks,
-            history=history,
-            max_chunks=self._max_prompt_chunks,
-            assistant_name=self._assistant_name,
-            learned_facts=learned_facts_list if learned_facts_list else None,
-            news_articles=news_articles_list if news_articles_list else None,
-        )
+        if self._enable_tools:
+            self._tool_executor.reset()
+            tool_calls_made = []
 
-        answer = self._chat_provider.chat(messages=messages)
+            # Loop until model stops calling tools or max calls reached
+            while self._tool_executor.call_count < self._tool_executor.max_calls:
+                # Get model response
+                response = self._chat_provider.chat(messages=messages)
 
+                # Check for tool calls
+                tool_result, response_text = self._tool_executor.process_model_output(response)
+
+                if tool_result:
+                    # Tool was called: add to conversation history and loop
+                    tool_calls_made.append((tool_result.tool_name, tool_result.parameters))
+                    tool_output_msg = f"Tool result for {tool_result.tool_name}:\n{tool_result.output}"
+                    messages.append({"role": "assistant", "content": response})
+                    messages.append({"role": "user", "content": tool_output_msg})
+                else:
+                    # No tool call: model gave final response
+                    answer = response_text or response
+                    break
+            else:
+                # Max calls reached
+                answer = response_text or response
+
+            # If no answer was generated, use the last response
+            if not answer and messages and messages[-1].get("role") == "assistant":
+                answer = messages[-1].get("content", "I couldn't generate a response.")
+        else:
+            # No tool calling: use traditional approach with RAG
+            if self._is_conversational(question):
+                chunks = []
+                retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
+            else:
+                retrieval = self._retriever.retrieve(question=question, top_k=top_k)
+                chunks = retrieval.chunks
+
+            learned_facts_list = []
+            if self._fact_service:
+                personal_facts = self._fact_service.get_relevant_facts("personal", limit=3)
+                work_facts = self._fact_service.get_relevant_facts("work", limit=3)
+                learned_facts_list = [
+                    {"content": f.content} for f in (personal_facts + work_facts)
+                ]
+
+            messages = build_chat_messages(
+                question=question,
+                chunks=chunks,
+                history=history,
+                max_chunks=self._max_prompt_chunks,
+                assistant_name=self._assistant_name,
+                learned_facts=learned_facts_list if learned_facts_list else None,
+            )
+
+            answer = self._chat_provider.chat(messages=messages)
+
+        # Save to session history
         user_turn_id = str(uuid.uuid4())
         assistant_turn_id = str(uuid.uuid4())
 
@@ -222,7 +250,7 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
-        sources_used = not self._is_conversational(question)
+        sources_used = not self._is_conversational(question) and not self._enable_tools
         return QAResult(
             question=question,
             answer=answer,

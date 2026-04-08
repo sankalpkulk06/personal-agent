@@ -8,7 +8,9 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 
 ## ✨ Core Capabilities
 
-### **1. Smart Chat with Memory** 💬
+### **1. Smart Chat with Tool Calling** 💬
+- **Natural language understanding** — ask for things naturally without commands
+- **Automatic tool invocation** — model decides when to fetch news, save facts, add todos
 - **Persistent session history** — conversations are saved and can be resumed later
 - **Multi-turn context** — LLM remembers everything said in the session
 - **Resume any session** — `sage --resume <session-id>` to continue where you left off
@@ -62,6 +64,30 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
 - **Chunk size & overlap** — fine-tune document chunking
 - **Max results** — control news result count
+
+---
+
+## 🤖 How It Works: Open Source Tool Calling
+
+Sage uses **open source Ollama models with tool calling** — the model understands when to call tools based on natural language, without needing explicit commands.
+
+**The Flow:**
+1. **You ask naturally:** "What's the news on Tesla?" or "Remember that I like coffee"
+2. **Model understands intent:** Identifies that it needs to fetch news or save a fact
+3. **Automatically calls tools:** Generates JSON with the tool name and parameters
+4. **Tools execute:** Fetches news, saves facts, adds todos, searches documents
+5. **Model responds:** Incorporates tool results into a natural response
+
+**No `/commands` required** — but they still work as shortcuts if you prefer them.
+
+Example:
+```
+you: What's happening with SpaceX and can you add it to my reminders?
+Sage: I'll fetch the latest news and add it to your reminders.
+[Tool: fetch_news(query="SpaceX")]
+[Tool: add_todo(task="Check SpaceX update", due_date="today")]
+→ Found 5 articles about SpaceX... I've also added a reminder for you.
+```
 
 ---
 
@@ -330,16 +356,24 @@ DATA_DIR=./data
 
 ### Recommended Ollama Models
 
-**For speed (lightweight):**
+**For Tool Calling (recommended):**
 ```bash
-ollama pull nomic-embed-text      # 274MB — fast embeddings
-ollama pull mistral:7b            # Fast chat
+ollama pull llama3.1:8b           # Excellent tool calling, good speed
+ollama pull mistral:7b            # Very good tool calling, fast
 ```
 
-**For quality (larger):**
+**For Speed (lightweight, but less reliable tool calling):**
 ```bash
-ollama pull llama2:13b            # Better reasoning
-ollama pull all-minilm:22m        # Better embeddings
+ollama pull llama3.2:3b           # Smaller, but tool calling less reliable
+ollama pull nomic-embed-text      # 274MB — fast embeddings
+```
+
+**Note:** Smaller models (3b) have lower tool-calling accuracy. For best results with tool calling, use `llama3.1:8b` or `mistral:7b` (requires ~8GB RAM).
+
+**For Embeddings:**
+```bash
+ollama pull nomic-embed-text      # Fast and effective
+ollama pull all-minilm:22m        # Better quality, smaller than others
 ```
 
 ---

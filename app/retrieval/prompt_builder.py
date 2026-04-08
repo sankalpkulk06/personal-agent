@@ -1,4 +1,5 @@
-from typing import Any, List
+import json
+from typing import Any, List, Optional
 
 from app.retrieval.retriever import RetrievedChunk
 
@@ -102,3 +103,47 @@ def build_chat_messages(
     messages.append({"role": "user", "content": question})
 
     return messages
+
+
+def build_system_message_with_tools(
+    assistant_name: str = "Sage",
+    tools_schemas: Optional[List[dict[str, Any]]] = None,
+) -> str:
+    """Build a system message that instructs the model on tool use.
+
+    Args:
+        assistant_name: Name of the assistant
+        tools_schemas: List of tool schemas from ToolRegistry.to_schemas()
+
+    Returns:
+        System message string with tool definitions
+    """
+    message = (
+        f"You are {assistant_name} — a wise, knowledgeable personal companion with a thoughtful tone.\n\n"
+        "You have access to powerful tools. When the user's request would benefit from using a tool, "
+        "call it using JSON format. Otherwise, respond naturally to the conversation.\n\n"
+        "When using tools:\n"
+        "- Output ONLY valid JSON like: {\"tool\": \"tool_name\", \"parameters\": {\"key\": \"value\"}}\n"
+        "- Always use the exact tool name and parameters from the definitions below\n"
+        "- For natural language dates/times, describe them as the user said (e.g., 'tomorrow', 'next Tuesday')\n\n"
+    )
+
+    if tools_schemas:
+        message += "Available tools:\n"
+        for tool in tools_schemas:
+            message += f"\n- {tool['name']}: {tool['description']}\n"
+            if tool.get("parameters"):
+                params = tool["parameters"].get("properties", {})
+                for param_name, param_def in params.items():
+                    req = " (required)" if param_name in tool["parameters"].get("required", []) else " (optional)"
+                    message += f"  • {param_name}: {param_def.get('description', '')}{req}\n"
+
+    message += (
+        "\nRules:\n"
+        "- Use tools when they're relevant to the user's intent\n"
+        "- If no tool is needed, respond conversationally\n"
+        "- Be warm, thoughtful, and helpful\n"
+        "- Remember the conversation context for natural follow-ups\n"
+    )
+
+    return message
