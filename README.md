@@ -32,6 +32,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 ### **4. Live News Fetching** 📰
 - **Natural language news queries** — "What is the news on NASA today?"
 - **Direct news command** — `/news SpaceX` for instant formatted news
+- **AI-generated summaries** — get a consolidated summary (under 200 words) of all articles
 - **Topic extraction** — automatically extracts topics from questions
 - **Full sentence search** — `/news What happened with the Mars launch` works perfectly
 - **Persistent news context** — follow-up questions remember the articles
@@ -189,10 +190,32 @@ assistant
 You live in NYC.
 ```
 
+**Fetch news with AI-generated summary:**
+```
+you : /news Tesla
+━━━━━━ News: Tesla ━━━━━━
+
+📋 Summary
+Tesla's latest developments include advances in autonomous driving capabilities, expanding production facilities globally, and strategic partnerships in the EV market. The company continues to lead in battery technology innovation while facing competition from traditional automakers entering the electric vehicle space. Recent quarterly earnings show strong growth despite market volatility.
+
+📰 Articles
+[1] Tesla releases next-gen Model improvements
+    Reuters | 2026-04-08
+    https://news.google.com/...
+
+[2] Elon Musk announces new Gigafactory plans
+    Bloomberg | 2026-04-07
+    https://news.google.com/...
+
+[3] Tesla stock surges on strong earnings report
+    CNBC | 2026-04-06
+    https://news.google.com/...
+```
+
 **Chat with persistence:**
 ```
 you : What is the news on SpaceX today?
-# Fetches live articles, injects into context
+# Fetches live articles, displays summary, injects into context
 
 you : where was it launched from?
 assistant

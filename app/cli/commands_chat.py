@@ -18,7 +18,9 @@ from app.cli.commands_ask import (
     create_news_service,
     create_reminders_service,
 )
+from app.config import get_settings
 from app.core.reminders_service import RemindersServiceError
+from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
 
@@ -194,6 +196,14 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     fact_service = service.get_fact_service()
     news_service = create_news_service()
     reminders_service = create_reminders_service()
+
+    # Create chat provider for news summary generation
+    settings = get_settings()
+    chat_provider = OllamaChatProvider(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_chat_model,
+    )
+
     session_top_k = top_k
 
     if session_id is None:
@@ -330,6 +340,17 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 if articles:
                     news_title = f"News: {query}" if query else "Top News Today"
                     console.print(f"\n[bold cyan]━━━━━━ {news_title} ━━━━━━[/bold cyan]\n")
+
+                    # Generate and display summary
+                    with thinking_spinner("generating summary..."):
+                        summary = news_service.generate_summary(articles, chat_provider)
+
+                    console.print("[bold yellow]📋 Summary[/bold yellow]")
+                    console.print(summary)
+                    console.print()
+
+                    # Display articles
+                    console.print("[bold yellow]📰 Articles[/bold yellow]")
                     for i, article in enumerate(articles, 1):
                         console.print(f"[bold green][{i}][/bold green] [bold]{article.title}[/bold]")
                         console.print(f"[yellow]{article.source}[/yellow] [dim]| {article.published}[/dim]")

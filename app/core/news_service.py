@@ -1,9 +1,12 @@
 import re
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import requests
 from lxml import etree
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app.providers.ollama_chat import OllamaChatProvider
 
 
 class NewsArticle(BaseModel):
@@ -148,3 +151,36 @@ class NewsService:
             .replace("&gt;", ">")
         )
         return clean.strip()
+
+    def generate_summary(
+        self, articles: List[NewsArticle], chat_provider: "OllamaChatProvider"
+    ) -> str:
+        """Generate a consolidated summary of news articles under 200 words.
+
+        Args:
+            articles: List of NewsArticle objects to summarize
+            chat_provider: OllamaChatProvider instance for LLM generation
+
+        Returns:
+            A concise summary of the articles under 200 words
+        """
+        if not articles:
+            return "No articles to summarize."
+
+        # Build article context for the LLM
+        articles_text = "\n\n".join(
+            f"- {article.title}: {article.snippet}" for article in articles
+        )
+
+        prompt = f"""Based on these news articles, provide a concise summary under 200 words that captures the key themes and important points:
+
+{articles_text}
+
+Summary:"""
+
+        try:
+            summary = chat_provider.generate(prompt)
+            return summary
+        except Exception as e:
+            # Fallback to basic concatenation if LLM fails
+            return f"Could not generate summary: {str(e)}"
