@@ -179,7 +179,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             continue
 
         console.print()
-        console.print("[bold cyan]╭─ Assistant ─╮[/bold cyan]")
+        console.print("[bold cyan]╭─ Sage ─╮[/bold cyan]")
         console.print()
         console.print(result.answer)
         console.print()
@@ -200,6 +200,6 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                     console.print(f"[cyan]📄[/cyan] {source_label}")
             console.print()
 
-        console.print("[bold cyan]╰──────────────╯[/bold cyan]")
+        console.print("[bold cyan]╰──────────╯[/bold cyan]")
         console.print()
 
