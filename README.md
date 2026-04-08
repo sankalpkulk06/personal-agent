@@ -38,6 +38,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 ### **5. Apple Reminders Todos** ✅
 - **Quick todo capture** — `/todo Buy oat milk` adds a reminder from chat
 - **Natural language due dates** — `/todo Buy milk @tomorrow` or `/todo Call mom @next Tuesday at 3pm`
+- **Custom reminder lists** — `/todo Buy milk #Shopping` to add to specific lists
 - **Flexible date parsing** — supports relative dates, specific dates, and times
 - **Native macOS integration** — uses the built-in Reminders app through AppleScript
 - **Configurable target list** — choose a default list with `REMINDERS_DEFAULT_LIST`
@@ -135,7 +136,7 @@ sage --resume <session-id>  # Shortcut
 | `/facts [personal\|work]` | List learned facts |
 | `/forget <fact-id>` | Delete a fact |
 | `/news [query]` | Fetch live news |
-| `/todo <task> [@due]` | Add a task to Apple Reminders (with optional date/time) |
+| `/todo <task> [#list] [@due]` | Add a task to Apple Reminders (with optional list & date/time) |
 | `exit` or `quit` | Exit chat |
 
 ### Usage Examples
@@ -182,11 +183,17 @@ document sources:
 you : /todo Buy oat milk
 ✓ Added todo to Reminders: Buy oat milk
 
+you : /todo Buy groceries #Shopping
+✓ Added todo to Shopping: Buy groceries
+
 you : /todo Call mom @tomorrow
 ✓ Added todo to Reminders: Call mom due Wed, Apr 08 at 12:00AM
 
-you : /todo Meeting @next Tuesday at 3pm
-✓ Added todo to Reminders: Meeting due Tue, Apr 15 at 03:00PM
+you : /todo Pay rent #Bills @next 1st
+✓ Added todo to Bills: Pay rent due Thu, May 01 at 12:00AM
+
+you : /todo Meeting #Work @next Tuesday at 3pm
+✓ Added todo to Work: Meeting due Tue, Apr 15 at 03:00PM
 ```
 
 **Manage facts:**
@@ -247,22 +254,37 @@ sage chat --resume <id>      # Resume session
 sage --resume <id>           # Quick resume
 ```
 
-### Todo with Natural Language Dates
+### Todo with Natural Language Dates and Custom Lists
 
-In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates:
+In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates and custom lists:
 
 ```bash
-/todo Buy milk                           # Add task without due date
-/todo Call mom @tomorrow                 # Tomorrow at midnight
-/todo Meeting @next Tuesday at 3pm       # Specific day and time
-/todo Workout @3pm                       # Today at 3pm
-/todo Anniversary @April 15              # Specific date
+# Basic task
+/todo Buy milk
+
+# Add to specific Reminders list
+/todo Buy groceries #Shopping
+/todo Pay utilities #Bills
+/todo Review PR #Work
+
+# Add with due date
+/todo Call mom @tomorrow
+/todo Meeting @next Tuesday at 3pm
+/todo Workout @3pm
+
+# Combine list and due date
+/todo Dinner prep #Personal @6pm
+/todo Project deadline #Work @next Friday
+/todo Anniversary #Important @April 15
 ```
 
-Supported date patterns:
+**List syntax:** Use `#ListName` to specify which Reminders list to add to. If omitted, uses `REMINDERS_DEFAULT_LIST` (default: "Reminders").
+
+**Date patterns:**
 - **Relative:** today, tomorrow, tonight, next Monday, next week, etc.
 - **Specific dates:** April 15, 2026-04-20, April 15 at 9am
 - **Times:** 3pm, 9:30am, 14:45, etc.
+- **Combinations:** next Tuesday at 3pm, April 20 at 6:30pm
 
 ---
 
