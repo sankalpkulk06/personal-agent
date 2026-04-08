@@ -58,7 +58,15 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Context-aware** — different response style for personal facts vs. document answers
 - **Thoughtful advice** — like a trusted advisor, not a search engine
 
-### **8. Configuration & Customization** ⚙️
+### **8. Conversation Analytics** 📊
+- **Usage patterns** — track total sessions, turns, and conversation frequency
+- **Activity insights** — discover your most active days and times
+- **Command statistics** — see which commands you use most
+- **Topic analysis** — understand your top question types
+- **Fact insights** — review learned facts by category
+- **Dashboard view** — `/analytics` command for visual stats
+
+### **9. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
@@ -156,6 +164,7 @@ sage --resume <session-id>  # Shortcut
 | `/help` | Show all commands |
 | `/session` | Display current session ID |
 | `/sessions` | List recent chat sessions |
+| `/analytics` | View usage statistics and patterns |
 | `/topk <n>` | Set retrieval depth for this session |
 | `/remember-personal <fact>` | Save a personal fact |
 | `/remember-work <fact>` | Save a work fact |
@@ -242,6 +251,42 @@ you : /facts work
 
 you : /forget a1b2c3d4
 ✓ Fact forgotten
+```
+
+**View conversation analytics:**
+```
+you : /analytics
+╭─ Analytics Dashboard ─╮
+
+📊 Conversation Overview
+  Total Sessions:         12
+  Total Turns:            156
+  Avg Turns per Session:  13.0
+  Longest Session:        34 turns
+
+📈 Activity Patterns
+  First Session:          2026-03-20
+  Last Session:           2026-04-08
+  Days Active:            15
+  Sessions per Day:       0.80
+  Most Active Day:        Tuesday (3 sessions)
+  Most Active Hour:       14:00
+
+⚡ Top Commands
+  /news                  24 times
+  /todo                  18 times
+  /facts                 12 times
+
+💬 Top Question Words
+  what                   28 times
+  how                    15 times
+  why                    8 times
+
+🧠 Learned Facts by Category
+  personal               8 facts
+  work                   5 facts
+
+╰──────────────────────╯
 ```
 
 ---

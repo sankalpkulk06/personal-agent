@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 
 from app.config import get_settings
+from app.core.analytics_service import AnalyticsService
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
 from app.core.news_service import NewsService
@@ -54,6 +55,13 @@ def create_news_service() -> NewsService:
 def create_reminders_service() -> RemindersService:
     settings = get_settings()
     return RemindersService(default_list_name=settings.reminders_default_list)
+
+
+def create_analytics_service() -> AnalyticsService:
+    settings = get_settings()
+    paths = settings.resolve_paths()
+    registry = SQLiteRegistry(paths.sqlite_db_path)
+    return AnalyticsService(registry=registry)
 
 
 def create_chat_service() -> ChatService:
