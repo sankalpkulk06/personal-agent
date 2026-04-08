@@ -17,7 +17,7 @@ class ChatService:
         r"^(hi|hello|hey|howdy|sup|yo)\b",
         r"^how are you",
         r"^good (morning|afternoon|evening|night)",
-        r"what (is |'s )?(your )?name",
+        r"what (is |'s )?(your |my )?name",
         r"who are you",
         r"what are you",
         r"are you (an? )?(ai|bot|assistant)",
