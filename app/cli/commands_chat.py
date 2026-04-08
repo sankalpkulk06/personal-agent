@@ -63,7 +63,20 @@ def _parse_task_list_and_due_date(input_str: str) -> Tuple[str, Optional[str], O
     list_name = None
     due_date = None
 
-    # Extract due date if @ is present (process date first to avoid @ in list name)
+    # Extract list name FIRST if # is present (must be before date parsing to avoid fuzzy parser eating #)
+    if "#" in working_str:
+        task_part, list_part = working_str.rsplit("#", 1)
+        # If there's a date part after the list, extract just the list name
+        if "@" in list_part:
+            list_only, date_only = list_part.split("@", 1)
+            list_name = list_only.strip()
+            # Reconstruct: task @ date
+            working_str = f"{task_part.strip()} @{date_only}"
+        else:
+            list_name = list_part.strip()
+            working_str = task_part.strip()
+
+    # Extract due date if @ is present
     if "@" in working_str:
         task_part, date_part = working_str.rsplit("@", 1)
         date_str = date_part.strip().lower()
@@ -90,12 +103,6 @@ def _parse_task_list_and_due_date(input_str: str) -> Tuple[str, Optional[str], O
                 # If parsing fails, ignore and keep working_str as-is
                 task_part = working_str
 
-        working_str = task_part.strip()
-
-    # Extract list name if # is present
-    if "#" in working_str:
-        task_part, list_part = working_str.rsplit("#", 1)
-        list_name = list_part.strip()
         working_str = task_part.strip()
 
     return working_str, list_name, due_date
