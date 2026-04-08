@@ -1,7 +1,10 @@
 import uuid
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, Tuple
 
 import typer
+from dateutil import parser as date_parser
+from dateutil.relativedelta import relativedelta
 from prompt_toolkit import PromptSession
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.history import InMemoryHistory
@@ -40,6 +43,53 @@ def create_key_bindings():
 key_bindings = create_key_bindings()
 
 
+def _parse_task_and_due_date(input_str: str) -> Tuple[str, Optional[datetime]]:
+    """Parse task and optional due date from /todo input.
+
+    Supports format: /todo Buy milk @tomorrow or /todo Call mom @next Tuesday at 3pm
+
+    Args:
+        input_str: The input string without '/todo' prefix
+
+    Returns:
+        Tuple of (task, due_date) where due_date is None if not specified
+    """
+    if "@" not in input_str:
+        return input_str.strip(), None
+
+    task_part, date_part = input_str.rsplit("@", 1)
+    task = task_part.strip()
+    date_str = date_part.strip().lower()
+
+    if not date_str:
+        return task, None
+
+    try:
+        now = datetime.now()
+        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Handle simple relative dates
+        if date_str == "today":
+            return task, now
+        if date_str == "tomorrow":
+            return task, today + timedelta(days=1)
+        if date_str == "tonight":
+            return task, now.replace(hour=21, minute=0, second=0, microsecond=0)
+
+        # Try to parse as full date/time string
+        # First try with common patterns
+        due_date = date_parser.parse(date_str, fuzzy=True)
+
+        # If only time was provided (year=1900), apply to today
+        if due_date.year == 1900:
+            due_date = today.replace(hour=due_date.hour, minute=due_date.minute, second=due_date.second)
+
+        return task, due_date
+    except (ValueError, TypeError, OverflowError):
+        # If parsing fails, treat entire thing as task
+        return input_str.strip(), None
+
+
 def _print_help() -> None:
     console.print("\n[bold cyan]━━━━━━━━━━ Available Commands ━━━━━━━━━━[/bold cyan]")
     console.print()
@@ -53,7 +103,7 @@ def _print_help() -> None:
         ("/facts [category]", "List facts (personal|work)"),
         ("/forget <fact-id>", "Delete a fact"),
         ("/news [query]", "Fetch live news"),
-        ("/todo <task>", "Add a task to Apple Reminders"),
+        ("/todo <task> [@due]", "Add a task to Apple Reminders"),
         ("exit | quit", "Exit chat mode"),
     ]
     for cmd, desc in commands:
@@ -209,15 +259,22 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 console.print(f"\n[red]Error fetching news:[/red] {e}\n")
             continue
         if lowered == "/todo" or lowered.startswith("/todo "):
-            task = question[len("/todo"):].strip()
-            if not task:
-                console.print("\n[yellow]Usage:[/yellow] /todo <task>\n")
+            task_input = question[len("/todo"):].strip()
+            if not task_input:
+                console.print("\n[yellow]Usage:[/yellow] /todo <task> [@due-date]\n")
+                console.print("[dim]Examples: /todo Buy milk, /todo Call mom @tomorrow, /todo Meeting @next Tuesday at 3pm\n")
                 continue
 
             try:
-                target_list = reminders_service.add_reminder(task=task)
+                task, due_date = _parse_task_and_due_date(task_input)
+                if not task:
+                    console.print("\n[yellow]Usage:[/yellow] /todo <task> [@due-date]\n")
+                    continue
+
+                target_list = reminders_service.add_reminder(task=task, due_date=due_date)
+                due_date_str = f" due {due_date.strftime('%a, %b %d at %I:%M%p')}" if due_date else ""
                 console.print(
-                    f"\n[green]✓[/green] Added todo to [bold]{target_list}[/bold]: {task}\n"
+                    f"\n[green]✓[/green] Added todo to [bold]{target_list}[/bold]: {task}{due_date_str}\n"
                 )
             except RemindersServiceError as exc:
                 console.print(f"\n[red]✗[/red] {exc}\n")

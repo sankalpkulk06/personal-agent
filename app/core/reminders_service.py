@@ -1,4 +1,5 @@
 import subprocess
+from datetime import datetime
 from typing import Optional
 
 
@@ -21,13 +22,15 @@ class RemindersService:
     def default_list_name(self) -> str:
         return self._default_list_name
 
-    def add_reminder(self, task: str, list_name: Optional[str] = None) -> str:
+    def add_reminder(
+        self, task: str, list_name: Optional[str] = None, due_date: Optional[datetime] = None
+    ) -> str:
         reminder_name = task.strip()
         if not reminder_name:
             raise ValueError("task must not be empty")
 
         target_list = (list_name or self._default_list_name).strip() or "Reminders"
-        script = self._build_script(task=reminder_name, list_name=target_list)
+        script = self._build_script(task=reminder_name, list_name=target_list, due_date=due_date)
 
         try:
             subprocess.run(
@@ -49,16 +52,24 @@ class RemindersService:
     def _escape_applescript(value: str) -> str:
         return value.replace("\\", "\\\\").replace('"', '\\"')
 
-    def _build_script(self, task: str, list_name: str) -> str:
+    def _build_script(self, task: str, list_name: str, due_date: Optional[datetime] = None) -> str:
         escaped_task = self._escape_applescript(task)
         escaped_list = self._escape_applescript(list_name)
+
+        # Build properties dict for the reminder
+        properties = f'name:"{escaped_task}"'
+        if due_date:
+            # Format: date "Monday, January 1, 2025 at 9:00:00 AM"
+            date_str = due_date.strftime("%A, %B %d, %Y at %I:%M:%S %p")
+            properties += f', due date:date "{date_str}"'
+
         return f'''
 tell application "Reminders"
     if not (exists list "{escaped_list}") then
         make new list with properties {{name:"{escaped_list}"}}
     end if
     tell list "{escaped_list}"
-        make new reminder with properties {{name:"{escaped_task}"}}
+        make new reminder with properties {{{properties}}}
     end tell
 end tell
 '''.strip()

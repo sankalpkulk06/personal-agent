@@ -13,3 +13,4 @@ pytest
 httpx
 rich
 prompt_toolkit
+python-dateutil
