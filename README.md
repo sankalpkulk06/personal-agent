@@ -1,4 +1,4 @@
-# Sanky — Personal RAG Agent
+# Sage - Personal Agent
 
 A **local-first, privacy-respecting personal AI assistant** that combines retrieval-augmented generation (RAG) with persistent memory, live news, and intelligent conversation. Sanky is your personal study companion with personality—answering questions about your documents, remembering what you tell it, fetching live news, and maintaining full conversation context.
 
