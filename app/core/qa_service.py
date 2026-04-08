@@ -13,6 +13,7 @@ class QAResult(BaseModel):
     sources: List[RetrievedChunk] = Field(default_factory=list)
     retrieval: RetrievalResult
     prompt: str
+    sources_used: bool = Field(default=True)  # Whether documents were actually used to answer
 
 
 class QAService:

@@ -137,7 +137,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
 
         console.print("\n[bold magenta]assistant[/bold magenta]")
         console.print(result.answer)
-        if result.sources:
+        if result.sources_used and result.sources:
             console.print("[dim]sources:[/dim]")
             shown = set()
             for source in result.sources:
@@ -146,7 +146,5 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                     continue
                 shown.add(source_label)
                 console.print(f"[dim]- {source_label}[/dim]")
-        else:
-            console.print("[dim]sources: none[/dim]")
         console.print()
 

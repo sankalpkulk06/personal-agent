@@ -17,7 +17,9 @@ class ChatService:
         r"^(hi|hello|hey|howdy|sup|yo)\b",
         r"^how are you",
         r"^good (morning|afternoon|evening|night)",
-        r"what (is |'s )?(your |my )?name",
+        r"what (is |'s )?(your |my )?(name|last name|surname|birthday|birth year|age|location|job|work)",
+        r"where (do |)i (live|work)",
+        r"what (do |)i (do|work as)",
         r"who are you",
         r"what are you",
         r"are you (an? )?(ai|bot|assistant)",
@@ -127,6 +129,7 @@ class ChatService:
             sources=sources,
             retrieval=retrieval,
             prompt="",
+            sources_used=not self._is_conversational(question),
         )
 
     def create_session(self, session_id: str, title: str = "") -> None:
