@@ -2,6 +2,9 @@ import uuid
 from typing import Optional
 
 import typer
+from prompt_toolkit import PromptSession
+from prompt_toolkit.enums import EditingMode
+from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 
 from app.cli.commands_ask import create_chat_service, create_news_service
@@ -50,15 +53,21 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     console.print(f"[dim]│ Resume: sage --resume {session_id}[/dim]")
     console.print("[bold cyan]╰──────────────────────────╯[/bold cyan]")
     console.print()
-    console.print("[green]💡 Tip:[/green] Type [bold]/help[/bold] for commands")
+    console.print("[green]💡 Tip:[/green] Type [bold]/help[/bold] for commands | [bold]Shift+Enter[/bold] for multi-line")
     console.print()
+
+    # Create prompt session with history
+    session = PromptSession(history=InMemoryHistory())
 
     while True:
         try:
-            console.print("[bold blue]you[/bold blue]", end=" ")
-            user_input = typer.prompt("")
+            user_input = session.prompt(
+                "[bold blue]you[/bold blue] ",
+                multiline=True,
+                editing_mode=EditingMode.EMACS,
+            )
         except (EOFError, KeyboardInterrupt):
-            typer.echo("\nbye")
+            console.print("\n[dim]bye[/dim]")
             break
 
         question = user_input.strip()
