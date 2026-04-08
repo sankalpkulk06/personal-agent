@@ -43,51 +43,62 @@ def create_key_bindings():
 key_bindings = create_key_bindings()
 
 
-def _parse_task_and_due_date(input_str: str) -> Tuple[str, Optional[datetime]]:
-    """Parse task and optional due date from /todo input.
+def _parse_task_list_and_due_date(input_str: str) -> Tuple[str, Optional[str], Optional[datetime]]:
+    """Parse task, optional list name, and optional due date from /todo input.
 
-    Supports format: /todo Buy milk @tomorrow or /todo Call mom @next Tuesday at 3pm
+    Supports formats:
+    - /todo Buy milk
+    - /todo Buy milk #Shopping
+    - /todo Buy milk @tomorrow
+    - /todo Buy milk #Shopping @tomorrow
+    - /todo Buy milk @tomorrow #Shopping
 
     Args:
         input_str: The input string without '/todo' prefix
 
     Returns:
-        Tuple of (task, due_date) where due_date is None if not specified
+        Tuple of (task, list_name, due_date) where list_name and due_date are None if not specified
     """
-    if "@" not in input_str:
-        return input_str.strip(), None
+    working_str = input_str.strip()
+    list_name = None
+    due_date = None
 
-    task_part, date_part = input_str.rsplit("@", 1)
-    task = task_part.strip()
-    date_str = date_part.strip().lower()
+    # Extract due date if @ is present (process date first to avoid @ in list name)
+    if "@" in working_str:
+        task_part, date_part = working_str.rsplit("@", 1)
+        date_str = date_part.strip().lower()
 
-    if not date_str:
-        return task, None
+        if date_str:
+            try:
+                now = datetime.now()
+                today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    try:
-        now = datetime.now()
-        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                # Handle simple relative dates
+                if date_str == "today":
+                    due_date = now
+                elif date_str == "tomorrow":
+                    due_date = today + timedelta(days=1)
+                elif date_str == "tonight":
+                    due_date = now.replace(hour=21, minute=0, second=0, microsecond=0)
+                else:
+                    # Try to parse as full date/time string
+                    due_date = date_parser.parse(date_str, fuzzy=True)
+                    # If only time was provided (year=1900), apply to today
+                    if due_date.year == 1900:
+                        due_date = today.replace(hour=due_date.hour, minute=due_date.minute, second=due_date.second)
+            except (ValueError, TypeError, OverflowError):
+                # If parsing fails, ignore and keep working_str as-is
+                task_part = working_str
 
-        # Handle simple relative dates
-        if date_str == "today":
-            return task, now
-        if date_str == "tomorrow":
-            return task, today + timedelta(days=1)
-        if date_str == "tonight":
-            return task, now.replace(hour=21, minute=0, second=0, microsecond=0)
+        working_str = task_part.strip()
 
-        # Try to parse as full date/time string
-        # First try with common patterns
-        due_date = date_parser.parse(date_str, fuzzy=True)
+    # Extract list name if # is present
+    if "#" in working_str:
+        task_part, list_part = working_str.rsplit("#", 1)
+        list_name = list_part.strip()
+        working_str = task_part.strip()
 
-        # If only time was provided (year=1900), apply to today
-        if due_date.year == 1900:
-            due_date = today.replace(hour=due_date.hour, minute=due_date.minute, second=due_date.second)
-
-        return task, due_date
-    except (ValueError, TypeError, OverflowError):
-        # If parsing fails, treat entire thing as task
-        return input_str.strip(), None
+    return working_str, list_name, due_date
 
 
 def _print_help() -> None:
@@ -103,7 +114,7 @@ def _print_help() -> None:
         ("/facts [category]", "List facts (personal|work)"),
         ("/forget <fact-id>", "Delete a fact"),
         ("/news [query]", "Fetch live news"),
-        ("/todo <task> [@due]", "Add a task to Apple Reminders"),
+        ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("exit | quit", "Exit chat mode"),
     ]
     for cmd, desc in commands:
@@ -261,17 +272,21 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
         if lowered == "/todo" or lowered.startswith("/todo "):
             task_input = question[len("/todo"):].strip()
             if not task_input:
-                console.print("\n[yellow]Usage:[/yellow] /todo <task> [@due-date]\n")
-                console.print("[dim]Examples: /todo Buy milk, /todo Call mom @tomorrow, /todo Meeting @next Tuesday at 3pm\n")
+                console.print("\n[yellow]Usage:[/yellow] /todo <task> [#list] [@due-date]\n")
+                console.print("[dim]Examples:\n")
+                console.print("[dim]  /todo Buy milk\n")
+                console.print("[dim]  /todo Buy milk #Shopping\n")
+                console.print("[dim]  /todo Call mom @tomorrow\n")
+                console.print("[dim]  /todo Meeting #Work @next Tuesday at 3pm\n")
                 continue
 
             try:
-                task, due_date = _parse_task_and_due_date(task_input)
+                task, list_name, due_date = _parse_task_list_and_due_date(task_input)
                 if not task:
-                    console.print("\n[yellow]Usage:[/yellow] /todo <task> [@due-date]\n")
+                    console.print("\n[yellow]Usage:[/yellow] /todo <task> [#list] [@due-date]\n")
                     continue
 
-                target_list = reminders_service.add_reminder(task=task, due_date=due_date)
+                target_list = reminders_service.add_reminder(task=task, list_name=list_name, due_date=due_date)
                 due_date_str = f" due {due_date.strftime('%a, %b %d at %I:%M%p')}" if due_date else ""
                 console.print(
                     f"\n[green]✓[/green] Added todo to [bold]{target_list}[/bold]: {task}{due_date_str}\n"
