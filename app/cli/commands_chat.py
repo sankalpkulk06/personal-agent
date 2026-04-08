@@ -5,6 +5,8 @@ import typer
 from prompt_toolkit import PromptSession
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
 from rich.console import Console
 
 from app.cli.commands_ask import create_chat_service, create_news_service
@@ -12,6 +14,29 @@ from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
 
 console = Console()
+
+# Custom key bindings: Enter submits, Shift+Enter creates newline
+def create_key_bindings():
+    bindings = KeyBindings()
+
+    @bindings.add(Keys.Enter, eager=True)
+    def _(event):
+        # Enter submits the input
+        event.app.exit(result=event.app.current_buffer.text)
+
+    @bindings.add(Keys.Escape, Keys.Enter, eager=True)
+    def _(event):
+        # Escape+Enter creates a newline
+        event.current_buffer.insert_text('\n')
+
+    @bindings.add(Keys.ControlM, eager=True)
+    def _(event):
+        # Ctrl+M (alternative Enter) also submits
+        event.app.exit(result=event.app.current_buffer.text)
+
+    return bindings
+
+key_bindings = create_key_bindings()
 
 
 def _print_help() -> None:
@@ -57,16 +82,20 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     console.print()
 
     # Create prompt session with history
-    session = PromptSession(history=InMemoryHistory())
+    session = PromptSession(
+        history=InMemoryHistory(),
+        enable_history_search=True,
+    )
 
     while True:
         try:
-            # Use ANSI codes instead of Rich markup for prompt_toolkit
-            prompt_text = "\033[1;34myou\033[0m "  # Blue + bold
+            # Print colored prompt without newline
+            console.print("[bold blue]you[/bold blue] ", end="")
             user_input = session.prompt(
-                prompt_text,
+                "",  # Empty prompt since we printed it above
                 multiline=True,
                 editing_mode=EditingMode.EMACS,
+                key_bindings=key_bindings,
             )
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
