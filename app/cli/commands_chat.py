@@ -61,8 +61,10 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
 
     while True:
         try:
+            # Use ANSI codes instead of Rich markup for prompt_toolkit
+            prompt_text = "\033[1;34myou\033[0m "  # Blue + bold
             user_input = session.prompt(
-                "[bold blue]you[/bold blue] ",
+                prompt_text,
                 multiline=True,
                 editing_mode=EditingMode.EMACS,
             )
