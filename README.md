@@ -195,6 +195,9 @@ you : /todo Call mom @tomorrow
 you : /todo Pay rent #Bills @next 1st
 ✓ Added todo to Bills: Pay rent due Thu, May 01 at 12:00AM
 
+you : /todo Email tax documents @April 8th at 3pm #Todo
+✓ Added todo to Todo: Email tax documents due Wed, Apr 08 at 03:00PM
+
 you : /todo Meeting #Work @next Tuesday at 3pm
 ✓ Added todo to Work: Meeting due Tue, Apr 15 at 03:00PM
 
