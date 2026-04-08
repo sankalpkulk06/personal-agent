@@ -14,6 +14,7 @@ class QAResult(BaseModel):
     retrieval: RetrievalResult
     prompt: str
     sources_used: bool = Field(default=True)  # Whether documents were actually used to answer
+    news_sources: List[dict] = Field(default_factory=list)  # Live news articles fetched
 
 
 class QAService:

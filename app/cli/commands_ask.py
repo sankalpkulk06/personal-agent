@@ -6,6 +6,7 @@ from rich.console import Console
 from app.config import get_settings
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
+from app.core.news_service import NewsService
 from app.core.qa_service import QAService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
@@ -44,6 +45,11 @@ def create_fact_service() -> FactService:
     return FactService(registry=registry)
 
 
+def create_news_service() -> NewsService:
+    settings = get_settings()
+    return NewsService(max_results=settings.news_max_results)
+
+
 def create_chat_service() -> ChatService:
     settings = get_settings()
     paths = settings.resolve_paths()
@@ -62,11 +68,13 @@ def create_chat_service() -> ChatService:
     )
     registry = SQLiteRegistry(paths.sqlite_db_path)
     fact_service = create_fact_service()
+    news_service = create_news_service()
     return ChatService(
         retriever=retriever,
         chat_provider=chat_provider,
         registry=registry,
         fact_service=fact_service,
+        news_service=news_service,
         assistant_name=settings.assistant_name,
     )
 

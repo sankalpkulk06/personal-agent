@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
+from app.core.news_service import NewsService, NewsArticle
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages
 from app.retrieval.retriever import Retriever, RetrievalResult
@@ -29,12 +30,21 @@ class ChatService:
         r"^bye|^see you|^goodbye|^farewell",
     ]
 
+    NEWS_PATTERNS = [
+        r"(what('s| is) the news (on|about|for|regarding))",
+        r"(latest|recent|current|today'?s?) news (on|about|for|regarding)",
+        r"(any )?news (on|about|for|regarding)",
+        r"what happened (to|with|in)",
+        r"news (on|about)",
+    ]
+
     def __init__(
         self,
         retriever: Retriever,
         chat_provider: OllamaChatProvider,
         registry: SQLiteRegistry,
         fact_service: Optional[FactService] = None,
+        news_service: Optional[NewsService] = None,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sanky",
     ):
@@ -42,6 +52,7 @@ class ChatService:
         self._chat_provider = chat_provider
         self._registry = registry
         self._fact_service = fact_service
+        self._news_service = news_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
 
@@ -56,6 +67,48 @@ class ChatService:
             if re.search(pattern, q_lower):
                 return True
         return False
+
+    @staticmethod
+    def _is_news_query(question: str) -> bool:
+        """Check if a question is asking for news.
+
+        Uses regex patterns to detect news-related queries.
+        """
+        q_lower = question.lower().strip()
+        for pattern in ChatService.NEWS_PATTERNS:
+            if re.search(pattern, q_lower):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_news_topic(question: str) -> Optional[str]:
+        """Extract the news topic from a question.
+
+        Args:
+            question: The user question
+
+        Returns:
+            The extracted topic or None if not found
+        """
+        q_lower = question.lower().strip()
+
+        # Try to extract from common patterns
+        patterns = [
+            r"(what('s| is) the news (on|about|for|regarding)\s+)(.+)",
+            r"(latest|recent|current|today'?s?) news (on|about|for|regarding)\s+(.+)",
+            r"(any )?news (on|about|for|regarding)\s+(.+)",
+            r"what happened (to|with|in)\s+(.+)",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, q_lower)
+            if match:
+                topic = match.group(match.lastindex)  # Get last capture group
+                # Clean up common suffixes
+                topic = re.sub(r"\s+(today|yesterday|this week|right now)", "", topic).strip()
+                return topic
+
+        return None
 
     def answer_in_session(
         self, session_id: str, question: str, top_k: Optional[int] = None
@@ -75,11 +128,20 @@ class ChatService:
         """
         history = self.get_history(session_id)
 
+        news_articles: List[NewsArticle] = []
         if self._is_conversational(question):
             chunks = []
             sources = []
             retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
+        elif self._is_news_query(question) and self._news_service:
+            # News query: fetch live news
+            topic = self._extract_news_topic(question)
+            news_articles = self._news_service.search_news(topic) if topic else self._news_service.get_top_news()
+            chunks = []
+            sources = []
+            retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
         else:
+            # Document query: retrieve from knowledge base
             retrieval = self._retriever.retrieve(question=question, top_k=top_k)
             chunks = retrieval.chunks
             sources = retrieval.chunks
@@ -92,6 +154,16 @@ class ChatService:
                 {"content": f.content} for f in (personal_facts + work_facts)
             ]
 
+        news_articles_list = [
+            {
+                "title": article.title,
+                "source": article.source,
+                "url": article.url,
+                "published": article.published,
+            }
+            for article in news_articles
+        ]
+
         messages = build_chat_messages(
             question=question,
             chunks=chunks,
@@ -99,6 +171,7 @@ class ChatService:
             max_chunks=self._max_prompt_chunks,
             assistant_name=self._assistant_name,
             learned_facts=learned_facts_list if learned_facts_list else None,
+            news_articles=news_articles_list if news_articles_list else None,
         )
 
         answer = self._chat_provider.chat(messages=messages)
@@ -123,13 +196,15 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
+        sources_used = not self._is_conversational(question)
         return QAResult(
             question=question,
             answer=answer,
             sources=sources,
             retrieval=retrieval,
             prompt="",
-            sources_used=not self._is_conversational(question),
+            sources_used=sources_used,
+            news_sources=[{"title": a.title, "source": a.source, "url": a.url} for a in news_articles],
         )
 
     def create_session(self, session_id: str, title: str = "") -> None:

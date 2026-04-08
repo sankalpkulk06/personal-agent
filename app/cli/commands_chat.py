@@ -4,7 +4,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from app.cli.commands_ask import create_chat_service
+from app.cli.commands_ask import create_chat_service, create_news_service
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
 
@@ -21,6 +21,7 @@ def _print_help() -> None:
     typer.echo("- /remember-work <fact> : remember a work fact")
     typer.echo("- /facts [personal|work] : list learned facts (optionally by category)")
     typer.echo("- /forget <fact-id> : forget a learned fact")
+    typer.echo("- /news [query] : fetch live news (no query = top 5 general news)")
     typer.echo("- exit | quit : leave chat mode")
 
 
@@ -28,6 +29,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     """Run an interactive chat session with conversation history."""
     service = create_chat_service()
     fact_service = service.get_fact_service()
+    news_service = create_news_service()
     session_top_k = top_k
 
     if session_id is None:
@@ -122,6 +124,27 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             except Exception as e:
                 typer.echo(f"Error: {e}")
             continue
+        if lowered.startswith("/news"):
+            query = question[len("/news"):].strip()
+            try:
+                with thinking_spinner("fetching news..."):
+                    if query:
+                        articles = news_service.search_news(query)
+                    else:
+                        articles = news_service.get_top_news()
+
+                if articles:
+                    console.print("\n[bold cyan]Top News:[/bold cyan]")
+                    for i, article in enumerate(articles, 1):
+                        console.print(f"\n[bold]{i}. {article.title}[/bold]")
+                        console.print(f"[dim]Source: {article.source} | {article.published}[/dim]")
+                        console.print(f"[dim]{article.url}[/dim]")
+                else:
+                    typer.echo("No news found.")
+            except Exception as e:
+                typer.echo(f"Error fetching news: {e}")
+            console.print()
+            continue
 
         try:
             with thinking_spinner("generating answer..."):
@@ -137,8 +160,12 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
 
         console.print("\n[bold magenta]assistant[/bold magenta]")
         console.print(result.answer)
+        if result.news_sources:
+            console.print("[dim]news sources:[/dim]")
+            for i, source in enumerate(result.news_sources, 1):
+                console.print(f"[dim]- [{i}] {source['title']} — {source['source']}[/dim]")
         if result.sources_used and result.sources:
-            console.print("[dim]sources:[/dim]")
+            console.print("[dim]document sources:[/dim]")
             shown = set()
             for source in result.sources:
                 source_label = source.file_name or source.source_path or source.document_id

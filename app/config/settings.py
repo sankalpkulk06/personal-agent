@@ -21,6 +21,7 @@ class Settings(BaseModel):
     chunk_size: int = Field(default=800, gt=0)
     chunk_overlap: int = Field(default=120, ge=0)
     retrieval_top_k: int = Field(default=5, gt=0)
+    news_max_results: int = Field(default=5, gt=0)
 
     data_dir: Optional[Path] = None
 

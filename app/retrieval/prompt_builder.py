@@ -38,6 +38,7 @@ def build_chat_messages(
     max_chunks: int = 5,
     assistant_name: str = "Sanky",
     learned_facts: List[dict[str, Any]] = None,
+    news_articles: List[dict[str, Any]] = None,
 ) -> List[dict[str, Any]]:
     """Build a messages list for /api/chat endpoint with conversation history.
 
@@ -48,6 +49,7 @@ def build_chat_messages(
         max_chunks: Max context chunks to include
         assistant_name: Name of the assistant for personality
         learned_facts: Optional list of learned facts to inject
+        news_articles: Optional list of live news articles to inject
 
     Returns:
         A list of message dicts for the /api/chat endpoint
@@ -81,6 +83,15 @@ def build_chat_messages(
     if learned_facts:
         facts_block = "\n".join([f"- {fact['content']}" for fact in learned_facts])
         system_message += f"\n\nAbout the user (what I know):\n{facts_block}"
+
+    if news_articles:
+        news_block = "\n".join(
+            [
+                f"[{i}] {article['title']}\n    Source: {article['source']} | {article['published']}\n    URL: {article['url']}"
+                for i, article in enumerate(news_articles, 1)
+            ]
+        )
+        system_message += f"\n\nCurrent news (fetched live):\n{news_block}\n\nWhen citing these articles, reference them by number (e.g., '[1]')."
 
     if context_block:
         system_message += f"\n\nRelevant documents:\n{context_block}"
