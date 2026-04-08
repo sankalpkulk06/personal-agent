@@ -37,6 +37,8 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 
 ### **5. Apple Reminders Todos** ✅
 - **Quick todo capture** — `/todo Buy oat milk` adds a reminder from chat
+- **Natural language due dates** — `/todo Buy milk @tomorrow` or `/todo Call mom @next Tuesday at 3pm`
+- **Flexible date parsing** — supports relative dates, specific dates, and times
 - **Native macOS integration** — uses the built-in Reminders app through AppleScript
 - **Configurable target list** — choose a default list with `REMINDERS_DEFAULT_LIST`
 
@@ -133,7 +135,7 @@ sage --resume <session-id>  # Shortcut
 | `/facts [personal\|work]` | List learned facts |
 | `/forget <fact-id>` | Delete a fact |
 | `/news [query]` | Fetch live news |
-| `/todo <task>` | Add a task to Apple Reminders |
+| `/todo <task> [@due]` | Add a task to Apple Reminders (with optional date/time) |
 | `exit` or `quit` | Exit chat |
 
 ### Usage Examples
@@ -178,7 +180,13 @@ document sources:
 **Capture a todo in Apple Reminders:**
 ```
 you : /todo Buy oat milk
-✓ Added todo to Errands: Buy oat milk
+✓ Added todo to Reminders: Buy oat milk
+
+you : /todo Call mom @tomorrow
+✓ Added todo to Reminders: Call mom due Wed, Apr 08 at 12:00AM
+
+you : /todo Meeting @next Tuesday at 3pm
+✓ Added todo to Reminders: Meeting due Tue, Apr 15 at 03:00PM
 ```
 
 **Manage facts:**
@@ -238,6 +246,23 @@ sage chat --top-k 7          # Custom retrieval depth
 sage chat --resume <id>      # Resume session
 sage --resume <id>           # Quick resume
 ```
+
+### Todo with Natural Language Dates
+
+In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates:
+
+```bash
+/todo Buy milk                           # Add task without due date
+/todo Call mom @tomorrow                 # Tomorrow at midnight
+/todo Meeting @next Tuesday at 3pm       # Specific day and time
+/todo Workout @3pm                       # Today at 3pm
+/todo Anniversary @April 15              # Specific date
+```
+
+Supported date patterns:
+- **Relative:** today, tomorrow, tonight, next Monday, next week, etc.
+- **Specific dates:** April 15, 2026-04-20, April 15 at 9am
+- **Times:** 3pm, 9:30am, 14:45, etc.
 
 ---
 
@@ -471,6 +496,9 @@ CHUNK_OVERLAP=120           # Overlap between chunks
 # Retrieval
 RETRIEVAL_TOP_K=5           # Documents to retrieve
 NEWS_MAX_RESULTS=5          # News articles to fetch
+
+# Reminders (macOS)
+REMINDERS_DEFAULT_LIST=Reminders  # Default Reminders list for /todo
 
 # Personality
 ASSISTANT_NAME=Sage        # Your assistant's name
