@@ -12,17 +12,23 @@ console = Console()
 
 
 def _print_help() -> None:
-    typer.echo("Commands:")
-    typer.echo("- /help : show help")
-    typer.echo("- /topk <n> : set retrieval depth for this chat session")
-    typer.echo("- /session : show current session ID")
-    typer.echo("- /sessions : list recent chat sessions")
-    typer.echo("- /remember-personal <fact> : remember a personal fact")
-    typer.echo("- /remember-work <fact> : remember a work fact")
-    typer.echo("- /facts [personal|work] : list learned facts (optionally by category)")
-    typer.echo("- /forget <fact-id> : forget a learned fact")
-    typer.echo("- /news [query] : fetch live news (no query = top 5 general news)")
-    typer.echo("- exit | quit : leave chat mode")
+    console.print("\n[bold cyan]━━━━━━━━━━ Available Commands ━━━━━━━━━━[/bold cyan]")
+    console.print()
+    commands = [
+        ("/help", "Show this help message"),
+        ("/topk <n>", "Set retrieval depth (default: 5)"),
+        ("/session", "Show current session ID"),
+        ("/sessions", "List recent chat sessions"),
+        ("/remember-personal <fact>", "Remember a personal fact"),
+        ("/remember-work <fact>", "Remember a work fact"),
+        ("/facts [category]", "List facts (personal|work)"),
+        ("/forget <fact-id>", "Delete a fact"),
+        ("/news [query]", "Fetch live news"),
+        ("exit | quit", "Exit chat mode"),
+    ]
+    for cmd, desc in commands:
+        console.print(f"[bold green]{cmd:<30}[/bold green] {desc}")
+    console.print()
 
 
 def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) -> None:
@@ -38,10 +44,14 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     else:
         service.create_session(session_id=session_id)
 
-    console.print(f"[dim]Session: {session_id}  (resume with: sanky --resume {session_id})[/dim]")
     console.print()
-    typer.echo("Personal RAG Chat")
-    typer.echo("Type your question. Use /help for commands, exit to quit.")
+    console.print("[bold cyan]╭─ Personal RAG Chat ─╮[/bold cyan]")
+    console.print(f"[dim]│ Session: {session_id[:8]}...[/dim]")
+    console.print(f"[dim]│ Resume: sanky --resume {session_id}[/dim]")
+    console.print("[bold cyan]╰──────────────────────╯[/bold cyan]")
+    console.print()
+    console.print("[green]💡 Tip:[/green] Type [bold]/help[/bold] for commands")
+    console.print()
 
     while True:
         try:
@@ -63,17 +73,22 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             _print_help()
             continue
         if lowered == "/session":
-            typer.echo(f"Session: {session_id}")
+            console.print(f"\n[dim]Session ID:[/dim] [bold]{session_id}[/bold]\n")
             continue
         if lowered == "/sessions":
             sessions = service.list_sessions(limit=10)
             if sessions:
-                console.print("[bold]Recent sessions:[/bold]")
-                for s in sessions:
+                console.print()
+                console.print("[bold cyan]━━━━━━━━━━ Recent Sessions ━━━━━━━━━━[/bold cyan]")
+                console.print()
+                for i, s in enumerate(sessions, 1):
                     title = s["title"] or "(untitled)"
-                    console.print(f"  {s['session_id'][:8]}... | {s['updated_at']} | {title}")
+                    sid = s["session_id"][:8]
+                    updated = s["updated_at"].split("T")[0]  # Extract date
+                    console.print(f"[bold]{i}.[/bold] {sid}...  [dim]{updated}[/dim]")
+                console.print()
             else:
-                typer.echo("No sessions found.")
+                console.print("\n[dim]No sessions found.[/dim]\n")
             continue
         if lowered.startswith("/topk "):
             maybe_value = question.split(maxsplit=1)[1].strip()
@@ -82,47 +97,51 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 if parsed <= 0:
                     raise ValueError("top_k must be positive")
                 session_top_k = parsed
-                typer.echo(f"top_k set to {session_top_k}")
+                console.print(f"\n[green]✓[/green] Retrieval depth set to [bold]{session_top_k}[/bold]\n")
             except ValueError:
-                typer.echo("Invalid /topk value. Example: /topk 3")
+                console.print("\n[red]✗[/red] Invalid value. Usage: /topk 5\n")
             continue
         if lowered.startswith("/remember-personal "):
             fact_text = question[len("/remember-personal "):].strip()
             if fact_text:
                 fact_service.remember(content=fact_text, category="personal")
-                typer.echo(f"✓ Remembered (personal): {fact_text}")
+                console.print(f"\n[green]✓[/green] [bold magenta]Personal fact[/bold magenta] saved: {fact_text}\n")
             else:
-                typer.echo("Usage: /remember-personal <fact>")
+                console.print("\n[yellow]Usage:[/yellow] /remember-personal <fact>\n")
             continue
         if lowered.startswith("/remember-work "):
             fact_text = question[len("/remember-work "):].strip()
             if fact_text:
                 fact_service.remember(content=fact_text, category="work")
-                typer.echo(f"✓ Remembered (work): {fact_text}")
+                console.print(f"\n[green]✓[/green] [bold cyan]Work fact[/bold cyan] saved: {fact_text}\n")
             else:
-                typer.echo("Usage: /remember-work <fact>")
+                console.print("\n[yellow]Usage:[/yellow] /remember-work <fact>\n")
             continue
         if lowered.startswith("/facts"):
             parts = lowered.split()
             category = parts[1] if len(parts) > 1 else None
             facts = fact_service.list_facts(category=category)
             if facts:
-                cat_label = f" ({category})" if category else ""
-                console.print(f"[bold]Learned facts{cat_label}:[/bold]")
+                cat_icon = {"personal": "👤", "work": "💼"}.get(category, "🧠")
+                cat_label = f" {cat_icon} {category.title()}" if category else " 🧠 All"
+                console.print(f"\n[bold cyan]━━━━━━ Learned Facts{cat_label} ━━━━━━[/bold cyan]")
+                console.print()
                 for i, fact in enumerate(facts[:20], 1):
                     fact_id = fact["fact_id"][:8]
-                    console.print(f"  [{i}] {fact['content']}")
-                    console.print(f"      [dim]{fact_id}... | {fact['created_at'][:10]}[/dim]")
+                    date = fact["created_at"][:10]
+                    console.print(f"[bold green][{i}][/bold green] {fact['content']}")
+                    console.print(f"[dim]    {fact_id}... | {date}[/dim]")
+                    console.print()
             else:
-                typer.echo("No facts learned yet.")
+                console.print("\n[dim]No facts learned yet. Use /remember-personal or /remember-work[/dim]\n")
             continue
         if lowered.startswith("/forget "):
             fact_id = question[len("/forget "):].strip()
             try:
                 fact_service.forget(fact_id)
-                typer.echo(f"✓ Forgotten.")
+                console.print(f"\n[green]✓[/green] Fact forgotten\n")
             except Exception as e:
-                typer.echo(f"Error: {e}")
+                console.print(f"\n[red]✗[/red] Error: {e}\n")
             continue
         if lowered.startswith("/news"):
             query = question[len("/news"):].strip()
@@ -134,16 +153,17 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                         articles = news_service.get_top_news()
 
                 if articles:
-                    console.print("\n[bold cyan]Top News:[/bold cyan]")
+                    news_title = f"News: {query}" if query else "Top News Today"
+                    console.print(f"\n[bold cyan]━━━━━━ {news_title} ━━━━━━[/bold cyan]\n")
                     for i, article in enumerate(articles, 1):
-                        console.print(f"\n[bold]{i}. {article.title}[/bold]")
-                        console.print(f"[dim]Source: {article.source} | {article.published}[/dim]")
-                        console.print(f"[dim]{article.url}[/dim]")
+                        console.print(f"[bold green][{i}][/bold green] [bold]{article.title}[/bold]")
+                        console.print(f"[yellow]{article.source}[/yellow] [dim]| {article.published}[/dim]")
+                        console.print(f"[blue underline]{article.url}[/blue underline]")
+                        console.print()
                 else:
-                    typer.echo("No news found.")
+                    console.print("\n[dim]No news found for your query.[/dim]\n")
             except Exception as e:
-                typer.echo(f"Error fetching news: {e}")
-            console.print()
+                console.print(f"\n[red]Error fetching news:[/red] {e}\n")
             continue
 
         try:
@@ -158,20 +178,28 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             typer.echo(f"error: ask failed: {exc}")
             continue
 
-        console.print("\n[bold magenta]assistant[/bold magenta]")
+        console.print()
+        console.print("[bold cyan]╭─ Assistant ─╮[/bold cyan]")
+        console.print()
         console.print(result.answer)
-        if result.news_sources:
-            console.print("[dim]news sources:[/dim]")
-            for i, source in enumerate(result.news_sources, 1):
-                console.print(f"[dim]- [{i}] {source['title']} — {source['source']}[/dim]")
-        if result.sources_used and result.sources:
-            console.print("[dim]document sources:[/dim]")
-            shown = set()
-            for source in result.sources:
-                source_label = source.file_name or source.source_path or source.document_id
-                if source_label in shown:
-                    continue
-                shown.add(source_label)
-                console.print(f"[dim]- {source_label}[/dim]")
+        console.print()
+
+        if result.news_sources or (result.sources_used and result.sources):
+            console.print("[bold cyan]─ Sources ─[/bold cyan]")
+            if result.news_sources:
+                for i, source in enumerate(result.news_sources, 1):
+                    console.print(f"[yellow]📰 [{i}][/yellow] {source['title']}")
+                    console.print(f"    [dim]{source['source']}[/dim]")
+            if result.sources_used and result.sources:
+                shown = set()
+                for source in result.sources:
+                    source_label = source.file_name or source.source_path or source.document_id
+                    if source_label in shown:
+                        continue
+                    shown.add(source_label)
+                    console.print(f"[cyan]📄[/cyan] {source_label}")
+            console.print()
+
+        console.print("[bold cyan]╰──────────────╯[/bold cyan]")
         console.print()
 
