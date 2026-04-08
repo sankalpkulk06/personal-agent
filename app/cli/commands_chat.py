@@ -9,7 +9,8 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from rich.console import Console
 
-from app.cli.commands_ask import create_chat_service, create_news_service
+from app.cli.commands_ask import create_chat_service, create_news_service, create_reminders_service
+from app.core.reminders_service import RemindersServiceError
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
 
@@ -52,6 +53,7 @@ def _print_help() -> None:
         ("/facts [category]", "List facts (personal|work)"),
         ("/forget <fact-id>", "Delete a fact"),
         ("/news [query]", "Fetch live news"),
+        ("/todo <task>", "Add a task to Apple Reminders"),
         ("exit | quit", "Exit chat mode"),
     ]
     for cmd, desc in commands:
@@ -64,6 +66,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     service = create_chat_service()
     fact_service = service.get_fact_service()
     news_service = create_news_service()
+    reminders_service = create_reminders_service()
     session_top_k = top_k
 
     if session_id is None:
@@ -205,6 +208,20 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             except Exception as e:
                 console.print(f"\n[red]Error fetching news:[/red] {e}\n")
             continue
+        if lowered == "/todo" or lowered.startswith("/todo "):
+            task = question[len("/todo"):].strip()
+            if not task:
+                console.print("\n[yellow]Usage:[/yellow] /todo <task>\n")
+                continue
+
+            try:
+                target_list = reminders_service.add_reminder(task=task)
+                console.print(
+                    f"\n[green]✓[/green] Added todo to [bold]{target_list}[/bold]: {task}\n"
+                )
+            except RemindersServiceError as exc:
+                console.print(f"\n[red]✗[/red] {exc}\n")
+            continue
 
         try:
             with thinking_spinner("generating answer..."):
@@ -242,4 +259,3 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
 
         console.print("[bold cyan]╰──────────╯[/bold cyan]")
         console.print()
-

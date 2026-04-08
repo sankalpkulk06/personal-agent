@@ -18,6 +18,19 @@ def test_settings_load_from_dotenv_and_env_override(tmp_path, monkeypatch):
     assert settings.ollama_base_url == "http://127.0.0.1:11434"
     assert settings.chunk_size == 1024
     assert settings.chunk_overlap == 100
+    assert settings.reminders_default_list == "Reminders"
+
+
+def test_settings_loads_reminders_list_override(tmp_path):
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text(
+        "REMINDERS_DEFAULT_LIST=Errands\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings.from_env(project_root=tmp_path)
+
+    assert settings.reminders_default_list == "Errands"
 
 
 def test_settings_resolve_local_paths(tmp_path):
@@ -30,4 +43,3 @@ def test_settings_resolve_local_paths(tmp_path):
     assert paths.sqlite_db_path == (tmp_path / "data" / "sqlite" / "registry.db").resolve()
     assert Path(paths.chroma_dir).exists()
     assert Path(paths.sqlite_dir).exists()
-

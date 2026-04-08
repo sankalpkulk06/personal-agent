@@ -8,6 +8,7 @@ from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
 from app.core.news_service import NewsService
 from app.core.qa_service import QAService
+from app.core.reminders_service import RemindersService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaEmbeddingsProvider, OllamaProviderError
@@ -48,6 +49,11 @@ def create_fact_service() -> FactService:
 def create_news_service() -> NewsService:
     settings = get_settings()
     return NewsService(max_results=settings.news_max_results)
+
+
+def create_reminders_service() -> RemindersService:
+    settings = get_settings()
+    return RemindersService(default_list_name=settings.reminders_default_list)
 
 
 def create_chat_service() -> ChatService:
@@ -115,4 +121,3 @@ def ask_command(
         paths = settings.resolve_paths()
         filepath = export_qa_to_markdown(result, paths.reports_dir)
         console.print(f"\n[green]✓ Exported to: {filepath}[/green]")
-

@@ -35,20 +35,25 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Persistent news context** — follow-up questions remember the articles
 - **Proper citations** — news sources cited separately from documents
 
-### **5. Document Management** 📚
+### **5. Apple Reminders Todos** ✅
+- **Quick todo capture** — `/todo Buy oat milk` adds a reminder from chat
+- **Native macOS integration** — uses the built-in Reminders app through AppleScript
+- **Configurable target list** — choose a default list with `REMINDERS_DEFAULT_LIST`
+
+### **6. Document Management** 📚
 - **Multi-format support** — `.txt`, `.md`, `.pdf` files
 - **Bulk ingestion** — `sage ingest --path ./documents/`
 - **Metadata tracking** — file size, type, date, checksums
 - **Vector embeddings** — semantic search across all documents
 - **Citation system** — all answers cite exact document sources
 
-### **6. Personality-Driven Responses** 🎭
+### **7. Personality-Driven Responses** 🎭
 - **Named assistant** — "You are Sanky — a sharp, witty personal study companion"
 - **Natural tone** — conversational, not robotic
 - **Context-aware** — different response style for personal facts vs. document answers
 - **Humor** — maintains personality while staying helpful
 
-### **7. Configuration & Customization** ⚙️
+### **8. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
@@ -128,6 +133,7 @@ sage --resume <session-id>  # Shortcut
 | `/facts [personal\|work]` | List learned facts |
 | `/forget <fact-id>` | Delete a fact |
 | `/news [query]` | Fetch live news |
+| `/todo <task>` | Add a task to Apple Reminders |
 | `exit` or `quit` | Exit chat |
 
 ### Usage Examples
@@ -167,6 +173,12 @@ assistant
 According to your notes [1], machine learning is...
 document sources:
 - [1] machine-learning-notes.md
+```
+
+**Capture a todo in Apple Reminders:**
+```
+you : /todo Buy oat milk
+✓ Added todo to Errands: Buy oat milk
 ```
 
 **Manage facts:**
@@ -238,6 +250,7 @@ sage --resume <id>           # Quick resume
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=llama3.2:3b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+REMINDERS_DEFAULT_LIST=Reminders
 
 # Chunking
 CHUNK_SIZE=800
