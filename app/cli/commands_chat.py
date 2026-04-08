@@ -170,9 +170,9 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 console.print(f"\n[bold cyan]━━━━━━ Learned Facts{cat_label} ━━━━━━[/bold cyan]")
                 console.print()
                 for i, fact in enumerate(facts[:20], 1):
-                    fact_id = fact["fact_id"][:8]
-                    date = fact["created_at"][:10]
-                    console.print(f"[bold green][{i}][/bold green] {fact['content']}")
+                    fact_id = fact.fact_id[:8]
+                    date = fact.created_at[:10]
+                    console.print(f"[bold green][{i}][/bold green] {fact.content}")
                     console.print(f"[dim]    {fact_id}... | {date}[/dim]")
                     console.print()
             else:
