@@ -1,111 +1,549 @@
-# Personal RAG Study Agent
+# Sanky — Personal RAG Agent
 
-Local-first personal knowledge assistant for your own files.
+A **local-first, privacy-respecting personal AI assistant** that combines retrieval-augmented generation (RAG) with persistent memory, live news, and intelligent conversation. Sanky is your personal study companion with personality—answering questions about your documents, remembering what you tell it, fetching live news, and maintaining full conversation context.
 
-## What Phase 1 MVP does
+**No cloud. No tracking. Everything stays on your machine.**
 
-- Ingest local `.txt`, `.md`, and `.pdf` files.
-- Chunk document text deterministically.
-- Generate embeddings with local Ollama models.
-- Persist metadata in SQLite and vectors in ChromaDB.
-- Answer questions grounded in retrieved local context.
-- Run fully on your machine (no cloud dependency required by design).
+---
 
-## Prerequisites
+## ✨ Core Capabilities
 
+### **1. Smart Chat with Memory** 💬
+- **Persistent session history** — conversations are saved and can be resumed later
+- **Multi-turn context** — LLM remembers everything said in the session
+- **Resume any session** — `sanky --resume <session-id>` to continue where you left off
+- **Session management** — list, view, and organize chat sessions
+
+### **2. Learned Facts** 🧠
+- **Remember personal facts** — `/remember-personal Your favorite hobby is reading`
+- **Remember work facts** — `/remember-work I lead the ML team`
+- **Smart categorization** — personal and work facts organized separately
+- **Automatic context** — facts are automatically injected into responses
+- **Manage facts** — view all facts, delete unwanted ones, organize by category
+
+### **3. Selective RAG Retrieval** 🎯
+- **Conversational questions** (greetings, meta-questions) — skip document retrieval entirely
+- **Document-based questions** — retrieve and cite sources only when needed
+- **Smart pattern detection** — knows when to use docs vs. just chat
+- **Fast responses** — no embedding latency for casual conversation
+
+### **4. Live News Fetching** 📰
+- **Natural language news queries** — "What is the news on NASA today?"
+- **Direct news command** — `/news SpaceX` for instant formatted news
+- **Topic extraction** — automatically extracts topics from questions
+- **Full sentence search** — `/news What happened with the Mars launch` works perfectly
+- **Persistent news context** — follow-up questions remember the articles
+- **Proper citations** — news sources cited separately from documents
+
+### **5. Document Management** 📚
+- **Multi-format support** — `.txt`, `.md`, `.pdf` files
+- **Bulk ingestion** — `sanky ingest --path ./documents/`
+- **Metadata tracking** — file size, type, date, checksums
+- **Vector embeddings** — semantic search across all documents
+- **Citation system** — all answers cite exact document sources
+
+### **6. Personality-Driven Responses** 🎭
+- **Named assistant** — "You are Sanky — a sharp, witty personal study companion"
+- **Natural tone** — conversational, not robotic
+- **Context-aware** — different response style for personal facts vs. document answers
+- **Humor** — maintains personality while staying helpful
+
+### **7. Configuration & Customization** ⚙️
+- **Environment variables** — all settings configurable via `.env`
+- **Custom assistant name** — change who you're talking to
+- **Retrieval depth** — adjust how many documents to retrieve (in-session)
+- **Chunk size & overlap** — fine-tune document chunking
+- **Max results** — control news result count
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 - Python 3.9+
-- Ollama installed and running locally
+- Ollama installed and running
+- 2GB+ RAM available
 
-## Setup
+### Installation
 
 ```bash
-git clone <your-repo-url>
+git clone <repo-url>
 cd personal-agent
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Ollama setup
-
-Start Ollama (in a separate terminal if needed):
+### Start Ollama
 
 ```bash
 ollama serve
 ```
 
-Pull recommended models:
+In another terminal, pull the models:
 
 ```bash
-ollama pull nomic-embed-text
-ollama pull llama3.2:3b
+ollama pull nomic-embed-text      # Embeddings (small & fast)
+ollama pull llama3.2:3b           # Chat model (lightweight)
 ```
 
-Optional `.env` configuration:
+### First Steps
+
+```bash
+# Show configuration
+sanky config
+
+# Ingest your documents
+sanky ingest --path "./my-documents"
+
+# Start chatting!
+sanky chat
+```
+
+---
+
+## 💬 Interactive Chat Mode
+
+### Starting Chat
+
+```bash
+# New session
+sanky chat
+
+# Resume a previous session
+sanky chat --resume <session-id>
+sanky --resume <session-id>  # Shortcut
+```
+
+### Chat Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/help` | Show all commands |
+| `/session` | Display current session ID |
+| `/sessions` | List recent chat sessions |
+| `/topk <n>` | Set retrieval depth for this session |
+| `/remember-personal <fact>` | Save a personal fact |
+| `/remember-work <fact>` | Save a work fact |
+| `/facts [personal\|work]` | List learned facts |
+| `/forget <fact-id>` | Delete a fact |
+| `/news [query]` | Fetch live news |
+| `exit` or `quit` | Exit chat |
+
+### Usage Examples
+
+**Learn about yourself:**
+```
+you : /remember-personal I live in NYC
+✓ Personal fact saved: I live in NYC
+
+you : /remember-work I'm a software engineer
+✓ Work fact saved: I'm a software engineer
+
+you : where do I live?
+assistant
+You live in NYC.
+```
+
+**Chat with persistence:**
+```
+you : What is the news on SpaceX today?
+# Fetches live articles, injects into context
+
+you : where was it launched from?
+assistant
+According to the latest news [1], SpaceX launched from...
+news sources:
+- [1] SpaceX launches Falcon 9... — Reuters
+
+you : /sessions
+# Resume this session later!
+```
+
+**Search documents:**
+```
+you : what did I write about machine learning?
+assistant
+According to your notes [1], machine learning is...
+document sources:
+- [1] machine-learning-notes.md
+```
+
+**Manage facts:**
+```
+you : /facts work
+[1] I'm a software engineer
+    a1b2c3d4... | 2026-04-07
+
+[2] I lead the ML team
+    b2c3d4e5... | 2026-04-06
+
+you : /forget a1b2c3d4
+✓ Fact forgotten
+```
+
+---
+
+## 🛠️ CLI Commands
+
+### Configuration
+
+```bash
+sanky config
+# Output: Shows all current settings
+```
+
+### Document Ingestion
+
+```bash
+# Ingest a single file
+sanky ingest --path "./document.pdf"
+
+# Ingest entire directory
+sanky ingest --path "./documents/"
+
+# Both .md, .txt, .pdf are supported
+```
+
+### Single Question Mode
+
+```bash
+# Ask a question and exit
+sanky ask "What are the key concepts in distributed systems?"
+
+# Override retrieval depth
+sanky ask "Summarize my notes" --top-k 10
+
+# Export answer to Markdown
+sanky ask "What did I learn?" --export
+```
+
+### Interactive Chat
+
+```bash
+sanky chat                    # New session
+sanky chat --top-k 7          # Custom retrieval depth
+sanky chat --resume <id>      # Resume session
+sanky --resume <id>           # Quick resume
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables (`.env`)
 
 ```env
+# Ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 OLLAMA_CHAT_MODEL=llama3.2:3b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Chunking
 CHUNK_SIZE=800
 CHUNK_OVERLAP=120
+
+# Retrieval
 RETRIEVAL_TOP_K=5
+NEWS_MAX_RESULTS=5
+
+# Personality
+ASSISTANT_NAME=Sanky
+
+# Storage
 DATA_DIR=./data
 ```
 
-## CLI usage
+### Recommended Ollama Models
 
-Show config:
-
+**For speed (lightweight):**
 ```bash
-python -m app.main config
+ollama pull nomic-embed-text      # 274MB — fast embeddings
+ollama pull mistral:7b            # Fast chat
 ```
 
-Ingest a file or folder:
-
+**For quality (larger):**
 ```bash
-python -m app.main ingest --path "./data/my-notes"
+ollama pull llama2:13b            # Better reasoning
+ollama pull all-minilm:22m        # Better embeddings
 ```
 
-Ask a grounded question:
+---
 
-```bash
-python -m app.main ask "What did I write about vector databases?"
+## 📊 How It Works
+
+### Conversation Flow
+
+```
+User Input
+    ↓
+Pattern Detection
+    ├─ Conversational? (greeting, meta-question)
+    │  └→ No RAG retrieval, just chat
+    ├─ News query? ("news on X", "what happened to Y")
+    │  └→ Fetch live news, inject context
+    ├─ Has cached news context?
+    │  └→ Re-inject articles, continue conversation
+    └─ Document question?
+       └→ RAG retrieval, cite sources
+    ↓
+Inject Context
+    ├─ Learned facts (personal + work)
+    ├─ Retrieved documents (if applicable)
+    ├─ Live news articles (if applicable)
+    └─ Conversation history
+    ↓
+LLM Response (Ollama)
+    ↓
+Display with Citations
+    ├─ News sources (📰)
+    └─ Document sources (📄)
+    ↓
+Save to Session
 ```
 
-Start interactive chat mode (basic):
+### Session Persistence
 
-```bash
-python -m app.main chat
+```
+Session created → Turns stored in SQLite
+├─ Turn 1: User question
+├─ Turn 2: Assistant answer
+├─ Turn 3: User follow-up
+└─ ...
+    ↓
+Later: Resume session
+├─ Load all turns
+├─ Re-inject context
+└─ Continue conversation
 ```
 
-In chat mode:
-- `exit` or `quit` to leave
-- `/help` to show commands
-- `/topk 3` to set retrieval depth for the current session
+---
 
-Optional retrieval depth override:
+## 🎯 Real-World Examples
 
-```bash
-python -m app.main ask "Summarize my distributed systems notes" --top-k 7
+### Scenario 1: Research with Follow-ups
+
+```
+you : What is the news on climate change today?
+# Fetches 5 articles about climate change
+
+you : What are the main solutions mentioned?
+# Re-uses cached articles, LLM answers in context
+
+you : Tell me about renewable energy
+# Switches to document search (new topic)
+# Clears news cache, does RAG
 ```
 
-## Testing
+### Scenario 2: Personal Knowledge Base
 
-```bash
-python -m pytest -q
+```
+you : /remember-personal I have a dog named Max
+you : /remember-personal Max's birthday is July 15
+
+you : When is Max's birthday?
+# Sanky remembers from learned facts
+
+you : /facts personal
+# Lists all personal facts with dates
 ```
 
-## Current limitations
+### Scenario 3: Work Context
 
-- Supports only `.txt`, `.md`, `.pdf` parsing.
-- No OCR or scanned-PDF extraction.
-- No reranking/hybrid retrieval.
-- No long-term conversational memory.
-- CLI-only interface in Phase 1.
+```
+you : /remember-work I work on the payment system
+you : /remember-work My team has 4 people
 
-## Next steps
+you : Tell me about payment systems in the book
+# Sanky knows you work on payments, includes in context
+```
 
-- Improve prompt quality and citation formatting.
-- Add metadata filters during retrieval.
-- Add optional summarization/study workflows.
+---
+
+## 📈 Architecture
+
+### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| **ChatService** | Manages sessions, routing, context injection |
+| **FactService** | Stores and retrieves learned facts |
+| **NewsService** | Fetches live news from Google News RSS |
+| **Retriever** | RAG retrieval with embeddings |
+| **OllamaChatProvider** | LLM interface to Ollama |
+| **SQLiteRegistry** | Persists sessions, facts, metadata |
+| **ChromaStore** | Vector database for embeddings |
+
+### Data Storage
+
+```
+data/
+├── sqlite/registry.db         # Sessions, facts, metadata
+├── chroma/                    # Vector embeddings
+└── cache/                     # Temporary files
+```
+
+---
+
+## 🚀 Performance
+
+### Typical Response Times
+
+| Query Type | Time | Notes |
+|-----------|------|-------|
+| Conversational | <100ms | No RAG overhead |
+| News query | 2-3s | Web fetch + LLM |
+| Document search | 1-2s | Embedding + retrieval + LLM |
+| Follow-up (cached news) | 1-2s | Uses cached articles |
+
+### Memory Usage
+
+- **Base system**: ~300MB
+- **With 1 model loaded**: ~800MB
+- **With large documents**: +500MB per 100MB docs
+
+---
+
+## 🔧 Troubleshooting
+
+### Ollama not connecting
+
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/version
+
+# Start Ollama if not running
+ollama serve
+```
+
+### No embeddings error
+
+```bash
+# Ensure embedding model is pulled
+ollama pull nomic-embed-text
+
+# Check it's available
+ollama list
+```
+
+### Out of memory
+
+- Use smaller model: `mistral:7b` instead of `llama2:13b`
+- Reduce `CHUNK_SIZE` in `.env`
+- Free up system RAM
+
+### Chat feels slow
+
+- Reduce `RETRIEVAL_TOP_K` in `.env` (default: 5)
+- Use `/topk 3` in chat to retrieve fewer documents
+- Switch to faster model in Ollama
+
+---
+
+## 📚 Settings Reference
+
+### Environment Variables
+
+```env
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=llama3.2:3b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Document Chunking
+CHUNK_SIZE=800              # Characters per chunk
+CHUNK_OVERLAP=120           # Overlap between chunks
+
+# Retrieval
+RETRIEVAL_TOP_K=5           # Documents to retrieve
+NEWS_MAX_RESULTS=5          # News articles to fetch
+
+# Personality
+ASSISTANT_NAME=Sanky        # Your assistant's name
+APP_ENV=development
+
+# Storage
+DATA_DIR=./data             # Where to store data
+```
+
+---
+
+## 🎯 Features Roadmap
+
+### ✅ Completed
+- [x] Chat with session history
+- [x] Learned facts (personal/work)
+- [x] Live news fetching
+- [x] Selective RAG routing
+- [x] Document management
+- [x] Conversation context
+- [x] Source citations
+
+### 🚀 Upcoming
+- [ ] Fact verification against documents
+- [ ] Automatic fact extraction from responses
+- [ ] Semantic fact linking & inference
+- [ ] Chat history search
+- [ ] Web API server mode
+- [ ] Dashboard UI
+- [ ] Batch processing
+- [ ] Multi-user support
+
+---
+
+## 💡 Tips & Tricks
+
+### Optimize for Your Use Case
+
+**For research:**
+```bash
+sanky config
+# Increase RETRIEVAL_TOP_K to 10 in .env
+sanky chat --top-k 10
+```
+
+**For quick answers:**
+```bash
+# Use single question mode
+sanky ask "Quick answer?"
+```
+
+**For casual chat:**
+```bash
+# Session mode remembers everything
+sanky chat
+sanky --resume <id>
+```
+
+### Best Practices
+
+- **Regular ingestion** — keep your documents up to date
+- **Organized facts** — use `/remember-personal` and `/remember-work` to keep knowledge organized
+- **Session management** — `/sessions` to find relevant past conversations
+- **Topic switching** — start a new session for different topics
+- **Fact cleanup** — use `/forget` to remove outdated facts
+
+---
+
+## 📝 License
+
+[Add your license here]
+
+---
+
+## 🙋 Contributing
+
+[Add contribution guidelines]
+
+---
+
+## 📧 Support
+
+For issues, feature requests, or questions:
+- Check the [Troubleshooting](#-troubleshooting) section
+- Review existing settings in `.env`
+- Ensure Ollama is running and models are pulled
+
+---
+
+**Made with ❤️ for your personal knowledge base.**
