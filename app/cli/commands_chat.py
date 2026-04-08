@@ -89,10 +89,10 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
 
     while True:
         try:
-            # Print colored prompt without newline
-            console.print("[bold blue]you[/bold blue] ", end="")
+            # Print colored prompt with newline for proper cursor placement
+            console.print("[bold blue]you[/bold blue]")
             user_input = session.prompt(
-                "",  # Empty prompt since we printed it above
+                "> ",  # Input indicator on new line
                 multiline=True,
                 editing_mode=EditingMode.EMACS,
                 key_bindings=key_bindings,
