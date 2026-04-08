@@ -186,6 +186,9 @@ you : /todo Buy oat milk
 you : /todo Buy groceries #Shopping
 ✓ Added todo to Shopping: Buy groceries
 
+you : /todo Buy organic items #Shopping List
+✓ Added todo to Shopping List: Buy organic items
+
 you : /todo Call mom @tomorrow
 ✓ Added todo to Reminders: Call mom due Wed, Apr 08 at 12:00AM
 
@@ -194,6 +197,9 @@ you : /todo Pay rent #Bills @next 1st
 
 you : /todo Meeting #Work @next Tuesday at 3pm
 ✓ Added todo to Work: Meeting due Tue, Apr 15 at 03:00PM
+
+you : /todo Planning #Work Projects @next Friday at 10am
+✓ Added todo to Work Projects: Planning due Fri, Apr 11 at 10:00AM
 ```
 
 **Manage facts:**
@@ -267,6 +273,11 @@ In chat mode, use `/todo` to add tasks to Apple Reminders with optional due date
 /todo Pay utilities #Bills
 /todo Review PR #Work
 
+# Lists with spaces in names
+/todo Buy organic items #Shopping List
+/todo Pay rent #Bills and Expenses
+/todo Sprint planning #Work Projects
+
 # Add with due date
 /todo Call mom @tomorrow
 /todo Meeting @next Tuesday at 3pm
@@ -275,10 +286,10 @@ In chat mode, use `/todo` to add tasks to Apple Reminders with optional due date
 # Combine list and due date
 /todo Dinner prep #Personal @6pm
 /todo Project deadline #Work @next Friday
-/todo Anniversary #Important @April 15
+/todo Anniversary #Important Dates @April 15
 ```
 
-**List syntax:** Use `#ListName` to specify which Reminders list to add to. If omitted, uses `REMINDERS_DEFAULT_LIST` (default: "Reminders").
+**List syntax:** Use `#ListName` to specify which Reminders list to add to. List names can include spaces (e.g., `#Shopping List`, `#Bills and Expenses`). If omitted, uses `REMINDERS_DEFAULT_LIST` (default: "Reminders").
 
 **Date patterns:**
 - **Relative:** today, tomorrow, tonight, next Monday, next week, etc.
