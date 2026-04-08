@@ -11,7 +11,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 ### **1. Smart Chat with Memory** 💬
 - **Persistent session history** — conversations are saved and can be resumed later
 - **Multi-turn context** — LLM remembers everything said in the session
-- **Resume any session** — `sanky --resume <session-id>` to continue where you left off
+- **Resume any session** — `sage --resume <session-id>` to continue where you left off
 - **Session management** — list, view, and organize chat sessions
 
 ### **2. Learned Facts** 🧠
@@ -37,7 +37,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 
 ### **5. Document Management** 📚
 - **Multi-format support** — `.txt`, `.md`, `.pdf` files
-- **Bulk ingestion** — `sanky ingest --path ./documents/`
+- **Bulk ingestion** — `sage ingest --path ./documents/`
 - **Metadata tracking** — file size, type, date, checksums
 - **Vector embeddings** — semantic search across all documents
 - **Citation system** — all answers cite exact document sources
@@ -91,13 +91,13 @@ ollama pull llama3.2:3b           # Chat model (lightweight)
 
 ```bash
 # Show configuration
-sanky config
+sage config
 
 # Ingest your documents
-sanky ingest --path "./my-documents"
+sage ingest --path "./my-documents"
 
 # Start chatting!
-sanky chat
+sage chat
 ```
 
 ---
@@ -108,11 +108,11 @@ sanky chat
 
 ```bash
 # New session
-sanky chat
+sage chat
 
 # Resume a previous session
-sanky chat --resume <session-id>
-sanky --resume <session-id>  # Shortcut
+sage chat --resume <session-id>
+sage --resume <session-id>  # Shortcut
 ```
 
 ### Chat Commands
@@ -189,7 +189,7 @@ you : /forget a1b2c3d4
 ### Configuration
 
 ```bash
-sanky config
+sage config
 # Output: Shows all current settings
 ```
 
@@ -197,10 +197,10 @@ sanky config
 
 ```bash
 # Ingest a single file
-sanky ingest --path "./document.pdf"
+sage ingest --path "./document.pdf"
 
 # Ingest entire directory
-sanky ingest --path "./documents/"
+sage ingest --path "./documents/"
 
 # Both .md, .txt, .pdf are supported
 ```
@@ -209,22 +209,22 @@ sanky ingest --path "./documents/"
 
 ```bash
 # Ask a question and exit
-sanky ask "What are the key concepts in distributed systems?"
+sage ask "What are the key concepts in distributed systems?"
 
 # Override retrieval depth
-sanky ask "Summarize my notes" --top-k 10
+sage ask "Summarize my notes" --top-k 10
 
 # Export answer to Markdown
-sanky ask "What did I learn?" --export
+sage ask "What did I learn?" --export
 ```
 
 ### Interactive Chat
 
 ```bash
-sanky chat                    # New session
-sanky chat --top-k 7          # Custom retrieval depth
-sanky chat --resume <id>      # Resume session
-sanky --resume <id>           # Quick resume
+sage chat                    # New session
+sage chat --top-k 7          # Custom retrieval depth
+sage chat --resume <id>      # Resume session
+sage --resume <id>           # Quick resume
 ```
 
 ---
@@ -497,22 +497,22 @@ DATA_DIR=./data             # Where to store data
 
 **For research:**
 ```bash
-sanky config
+sage config
 # Increase RETRIEVAL_TOP_K to 10 in .env
-sanky chat --top-k 10
+sage chat --top-k 10
 ```
 
 **For quick answers:**
 ```bash
 # Use single question mode
-sanky ask "Quick answer?"
+sage ask "Quick answer?"
 ```
 
 **For casual chat:**
 ```bash
 # Session mode remembers everything
-sanky chat
-sanky --resume <id>
+sage chat
+sage --resume <id>
 ```
 
 ### Best Practices

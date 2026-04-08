@@ -12,7 +12,7 @@ from app.cli.commands_ingest import ingest_command
 cli = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Local-first personal RAG agent CLI.",
+    help="Sage — Your personal AI companion with memory and knowledge.",
 )
 
 
