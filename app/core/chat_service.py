@@ -187,6 +187,18 @@ class ChatService:
                 if tool_result:
                     # Tool was called: add to conversation history and loop
                     tool_calls_made.append((tool_result.tool_name, tool_result.parameters))
+
+                    # Track news articles if fetch_news was called
+                    if tool_result.tool_name == "fetch_news" and self._news_service:
+                        query = tool_result.parameters.get("query", "")
+                        fetched_articles = (
+                            self._news_service.search_news(query)
+                            if query
+                            else self._news_service.get_top_news()
+                        )
+                        if fetched_articles:
+                            news_articles.extend(fetched_articles)
+
                     tool_output_msg = f"Tool result for {tool_result.tool_name}:\n{tool_result.output}"
                     messages.append({"role": "assistant", "content": response})
                     messages.append({"role": "user", "content": tool_output_msg})
@@ -250,7 +262,8 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
-        sources_used = not self._is_conversational(question) and not self._enable_tools
+        # Sources are used if we have news articles or document chunks
+        sources_used = bool(news_articles or chunks)
         return QAResult(
             question=question,
             answer=answer,
