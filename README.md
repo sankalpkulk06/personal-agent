@@ -75,7 +75,15 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Cited responses** — every web result includes title and URL
 - **Explicit shortcut** — `/search <query>` to always hit the web directly
 
-### **10. Gmail Email Triage** 📧
+### **10. WhatsApp Integration** 💬
+- **Chat over WhatsApp** — send any message to Sage from your phone via the Twilio sandbox
+- **Persistent sessions** — same phone number always resumes the same conversation
+- **All commands work** — `/todo`, `/news`, `/search`, `/remember-*`, natural language — everything available in chat
+- **Long reply splitting** — responses over 1600 chars automatically split across multiple messages at sentence boundaries
+- **`sage serve` command** — starts a FastAPI webhook server Twilio forwards messages to
+- **ngrok-friendly** — works locally with ngrok for dev; any public HTTPS endpoint for prod
+
+### **11. Gmail Email Triage** 📧
 - **Fetch personal inbox** — pulls recent primary-tab emails via Gmail API
 - **AI-powered triage** — classifies each email as ACTION, FYI, or IGNORE
 - **Actionable summary** — surfaces what needs a reply or decision
@@ -83,7 +91,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Standalone command** — `sage email-personal` for a quick triage outside chat
 - **Filters automatically** — skips promotions, social, updates, and forums
 
-### **11. Configuration & Customization** ⚙️
+### **12. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
@@ -418,6 +426,19 @@ sage chat --resume <id>      # Resume session
 sage --resume <id>           # Quick resume
 ```
 
+### WhatsApp Webhook Server
+
+```bash
+# Start the webhook server (default port 8000)
+sage serve
+
+# Custom port
+sage serve --port 9000
+
+# With auto-reload for development
+sage serve --reload
+```
+
 ### Email Triage
 
 ```bash
@@ -484,6 +505,39 @@ Email triage requires a Google Cloud OAuth 2.0 credential.
 
 ---
 
+## 📱 WhatsApp Setup
+
+Requires a free [Twilio](https://twilio.com) account and [ngrok](https://ngrok.com) for local dev.
+
+1. **Twilio** — grab your **Account SID** and **Auth Token** from the [Console dashboard](https://console.twilio.com/console). Activate the WhatsApp Sandbox under **Messaging → Try it out → Send a WhatsApp message** and note your sandbox number.
+
+2. **Add to `.env`:**
+   ```env
+   TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+   ```
+
+3. **Join the sandbox** — from WhatsApp, send `join <sandbox-name>` (shown on the Twilio page) to `+1 415 523 8886`.
+
+4. **Start the server and expose it:**
+   ```bash
+   # Terminal 1
+   sage serve
+
+   # Terminal 2
+   ngrok http 8000
+   ```
+
+5. **Wire up Twilio** — in the Twilio sandbox settings, set **"When a message comes in"** to:
+   ```
+   https://xxxx.ngrok-free.app/webhook   (HTTP POST)
+   ```
+
+6. **Send a message** from WhatsApp to the sandbox number — Sage replies.
+
+---
+
 ## ⚙️ Configuration
 
 ### Environment Variables (`.env`)
@@ -508,6 +562,13 @@ EMAIL_MAX_RESULTS=20
 TAVILY_API_KEY=              # Optional — falls back to DuckDuckGo if not set
 WEB_SEARCH_MAX_RESULTS=5
 WEB_SEARCH_PROVIDER=tavily  # "tavily" | "duckduckgo"
+
+# WhatsApp (Twilio)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+WEBHOOK_PORT=8000
+WHATSAPP_ENABLED=true
 
 # Personality
 ASSISTANT_NAME=Sage
@@ -644,13 +705,15 @@ you : Tell me about payment systems in the book
 |-----------|---------|
 | **ChatService** | Manages sessions, routing, context injection |
 | **WebSearchService** | Live web search via Tavily or DuckDuckGo |
+| **WhatsAppService** | Twilio send wrapper with message splitting |
 | **FactService** | Stores and retrieves learned facts |
 | **NewsService** | Fetches live news from Google News RSS |
 | **EmailService** | Gmail fetch and AI triage |
 | **TodoService** | Adds tasks to macOS Reminders app |
+| **Webhook Server** | FastAPI server receiving Twilio webhooks |
 | **Retriever** | RAG retrieval with embeddings |
 | **OllamaChatProvider** | LLM interface to Ollama |
-| **SQLiteRegistry** | Persists sessions, facts, metadata |
+| **SQLiteRegistry** | Persists sessions, facts, WhatsApp sessions |
 | **ChromaStore** | Vector database for embeddings |
 
 ### Data Storage
@@ -786,9 +849,10 @@ DATA_DIR=./data             # Where to store data
 - [x] Conversation analytics dashboard
 - [x] Gmail email triage (personal inbox)
 - [x] Web search (Tavily + DuckDuckGo fallback)
+- [x] WhatsApp integration (text messages via Twilio)
 
 ### 🚀 Upcoming
-- [ ] WhatsApp integration (text + voice notes)
+- [ ] Voice notes over WhatsApp (Whisper transcription)
 - [ ] Habit tracker with streaks and reminders
 - [ ] Proactive morning briefings via WhatsApp
 - [ ] Fact verification against documents
