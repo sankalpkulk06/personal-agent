@@ -67,3 +67,10 @@ CREATE TABLE IF NOT EXISTS learned_facts (
 CREATE INDEX IF NOT EXISTS idx_learned_facts_category ON learned_facts (category);
 CREATE INDEX IF NOT EXISTS idx_learned_facts_created ON learned_facts (created_at);
 
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+    phone_number  TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_active   DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+

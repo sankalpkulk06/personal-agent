@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -205,6 +206,29 @@ class SQLiteRegistry:
         self._connection.execute(
             "UPDATE learned_facts SET usage_count = usage_count + 1, last_used_at = CURRENT_TIMESTAMP WHERE fact_id = ?",
             (fact_id,),
+        )
+        self._connection.commit()
+
+    def get_or_create_whatsapp_session(self, phone_number: str) -> str:
+        row = self._connection.execute(
+            "SELECT session_id FROM whatsapp_sessions WHERE phone_number = ?",
+            (phone_number,),
+        ).fetchone()
+        if row:
+            return row["session_id"]
+        session_id = str(uuid.uuid4())
+        self._connection.execute(
+            "INSERT INTO whatsapp_sessions (phone_number, session_id) VALUES (?, ?)",
+            (phone_number, session_id),
+        )
+        self.create_session(session_id=session_id, title=f"WhatsApp {phone_number}")
+        self._connection.commit()
+        return session_id
+
+    def update_whatsapp_last_active(self, phone_number: str) -> None:
+        self._connection.execute(
+            "UPDATE whatsapp_sessions SET last_active = CURRENT_TIMESTAMP WHERE phone_number = ?",
+            (phone_number,),
         )
         self._connection.commit()
 

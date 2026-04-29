@@ -29,6 +29,12 @@ class Settings(BaseModel):
     web_search_max_results: int = Field(default=5, gt=0)
     web_search_provider: str = "tavily"  # "tavily" | "duckduckgo"
 
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_number: str = ""  # e.g. "whatsapp:+14155238886"
+    webhook_port: int = 8000
+    whatsapp_enabled: bool = True
+
     data_dir: Optional[Path] = None
 
     @model_validator(mode="after")
