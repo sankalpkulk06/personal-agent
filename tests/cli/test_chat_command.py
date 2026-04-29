@@ -45,6 +45,9 @@ class _StubChatService:
     def get_fact_service(self):
         return _StubFactService()
 
+    def get_web_search_service(self):
+        return None
+
     def list_sessions(self, limit=10):
         return []
 

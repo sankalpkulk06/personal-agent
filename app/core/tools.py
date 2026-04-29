@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.core.fact_service import FactService
 from app.core.news_service import NewsService
 from app.core.reminders_service import RemindersService
+from app.core.web_search_service import WebSearchService
 from app.retrieval.retriever import Retriever
 
 
@@ -262,6 +263,44 @@ class SearchDocumentsTool(Tool):
             return {"success": False, "error": f"Failed to search documents: {str(e)}"}
 
 
+class WebSearchTool(Tool):
+    """Search the web for current information."""
+
+    def __init__(self, web_search_service: WebSearchService):
+        super().__init__(
+            name="web_search",
+            description=(
+                "Search the web for current factual information, recent events, definitions, "
+                "tutorials, or anything not in the user's documents."
+            ),
+            parameters=[
+                ToolParameter(
+                    name="query",
+                    type="string",
+                    description="The search query",
+                    required=True,
+                )
+            ],
+        )
+        self.web_search_service = web_search_service
+
+    def execute(self, query: str = "", **kwargs) -> Dict[str, Any]:
+        try:
+            if not query:
+                return {"success": False, "error": "Query cannot be empty"}
+            results = self.web_search_service.search(query)
+            if results:
+                formatted = self.web_search_service.format_for_context(results)
+                return {
+                    "success": True,
+                    "result": formatted,
+                    "raw_results": [{"title": r.title, "url": r.url} for r in results],
+                }
+            return {"success": True, "result": f"No web results found for '{query}'", "raw_results": []}
+        except Exception as e:
+            return {"success": False, "error": f"Web search failed: {str(e)}"}
+
+
 class ToolRegistry:
     """Registry of all available tools."""
 
@@ -271,6 +310,7 @@ class ToolRegistry:
         fact_service: Optional[FactService] = None,
         reminders_service: Optional[RemindersService] = None,
         retriever: Optional[Retriever] = None,
+        web_search_service: Optional[WebSearchService] = None,
     ):
         self.tools: Dict[str, Tool] = {}
 
@@ -283,6 +323,8 @@ class ToolRegistry:
             self.register(AddTodoTool(reminders_service))
         if retriever:
             self.register(SearchDocumentsTool(retriever))
+        if web_search_service:
+            self.register(WebSearchTool(web_search_service))
 
     def register(self, tool: Tool) -> None:
         """Register a tool."""
