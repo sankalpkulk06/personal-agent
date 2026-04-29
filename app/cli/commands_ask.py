@@ -7,10 +7,10 @@ from app.config import get_settings
 from app.core.analytics_service import AnalyticsService
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
-from app.core.news_service import NewsService
 from app.core.qa_service import QAService
-from app.core.reminders_service import RemindersService
-from app.core.web_search_service import WebSearchService
+from app.services.news_service import NewsService
+from app.services.reminders_service import RemindersService
+from app.services.web_search_service import WebSearchService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaEmbeddingsProvider, OllamaProviderError

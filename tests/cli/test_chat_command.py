@@ -4,7 +4,7 @@ from typer.testing import CliRunner
 
 from app.cli.app import cli
 from app.core.qa_service import QAResult
-from app.core.reminders_service import RemindersServiceError
+from app.services.reminders_service import RemindersServiceError
 from app.retrieval.retriever import RetrievalResult, RetrievedChunk
 
 

@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from app.core.fact_service import FactService
-from app.core.news_service import NewsService
-from app.core.reminders_service import RemindersService
-from app.core.web_search_service import WebSearchService
+from app.services.news_service import NewsService
+from app.services.reminders_service import RemindersService
+from app.services.web_search_service import WebSearchService
 from app.retrieval.retriever import Retriever
 
 

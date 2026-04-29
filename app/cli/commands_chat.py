@@ -20,8 +20,8 @@ from app.cli.commands_ask import (
     create_web_search_service,
 )
 from app.config import get_settings
-from app.core.email_service import EmailService
-from app.core.reminders_service import RemindersServiceError
+from app.services.email_service import EmailService
+from app.services.reminders_service import RemindersServiceError
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner

@@ -4,11 +4,11 @@ from typing import List, Optional
 
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
-from app.core.news_service import NewsService, NewsArticle
-from app.core.reminders_service import RemindersService
+from app.services.news_service import NewsService, NewsArticle
+from app.services.reminders_service import RemindersService
 from app.core.tool_executor import ToolExecutor
 from app.core.tools import ToolRegistry
-from app.core.web_search_service import WebSearchService
+from app.services.web_search_service import WebSearchService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
 from app.retrieval.retriever import Retriever, RetrievalResult
