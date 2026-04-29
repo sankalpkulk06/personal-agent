@@ -25,6 +25,10 @@ class Settings(BaseModel):
     email_max_results: int = Field(default=20, gt=0)
     reminders_default_list: str = "Reminders"
 
+    tavily_api_key: str = ""
+    web_search_max_results: int = Field(default=5, gt=0)
+    web_search_provider: str = "tavily"  # "tavily" | "duckduckgo"
+
     data_dir: Optional[Path] = None
 
     @model_validator(mode="after")

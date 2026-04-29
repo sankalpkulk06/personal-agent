@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.rule import Rule
 
 from app.config import get_settings
-from app.core.email_service import AccountType, EmailService
+from app.services.email_service import AccountType, EmailService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.ui.spinner import thinking_spinner
 

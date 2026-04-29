@@ -4,7 +4,7 @@ from typer.testing import CliRunner
 
 from app.cli.app import cli
 from app.core.qa_service import QAResult
-from app.core.reminders_service import RemindersServiceError
+from app.services.reminders_service import RemindersServiceError
 from app.retrieval.retriever import RetrievalResult, RetrievedChunk
 
 
@@ -44,6 +44,9 @@ class _StubChatService:
 
     def get_fact_service(self):
         return _StubFactService()
+
+    def get_web_search_service(self):
+        return None
 
     def list_sessions(self, limit=10):
         return []

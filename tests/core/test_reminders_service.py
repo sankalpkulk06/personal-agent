@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from app.core.reminders_service import RemindersService, RemindersServiceError
+from app.services.reminders_service import RemindersService, RemindersServiceError
 
 
 def test_add_reminder_runs_osascript_with_expected_script(monkeypatch):
@@ -19,7 +19,7 @@ def test_add_reminder_runs_osascript_with_expected_script(monkeypatch):
         )
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("app.core.reminders_service.subprocess.run", fake_run)
+    monkeypatch.setattr("app.services.reminders_service.subprocess.run", fake_run)
 
     service = RemindersService(default_list_name="Errands")
     list_name = service.add_reminder('Buy "oat" milk')
@@ -41,7 +41,7 @@ def test_add_reminder_uses_provided_list_name(monkeypatch):
         commands.append(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("app.core.reminders_service.subprocess.run", fake_run)
+    monkeypatch.setattr("app.services.reminders_service.subprocess.run", fake_run)
 
     service = RemindersService(default_list_name="Errands")
     list_name = service.add_reminder("Walk dog", list_name="Today")
@@ -58,7 +58,7 @@ def test_add_reminder_wraps_subprocess_error(monkeypatch):
             stderr="Application isn't allowed to send Apple events to Reminders. (-1743)",
         )
 
-    monkeypatch.setattr("app.core.reminders_service.subprocess.run", fake_run)
+    monkeypatch.setattr("app.services.reminders_service.subprocess.run", fake_run)
 
     service = RemindersService()
 

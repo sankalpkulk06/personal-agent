@@ -17,10 +17,11 @@ from app.cli.commands_ask import (
     create_chat_service,
     create_news_service,
     create_reminders_service,
+    create_web_search_service,
 )
 from app.config import get_settings
-from app.core.email_service import EmailService
-from app.core.reminders_service import RemindersServiceError
+from app.services.email_service import EmailService
+from app.services.reminders_service import RemindersServiceError
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
@@ -256,6 +257,7 @@ def _print_help() -> None:
         ("/forget <fact-id>", "Delete a fact"),
         ("/email", "Check personal email and triage action items"),
         ("/news [query]", "Fetch live news"),
+        ("/search <query>", "Search the web for current information"),
         ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("exit | quit", "Exit chat mode"),
     ]
@@ -268,6 +270,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     """Run an interactive chat session with conversation history."""
     service = create_chat_service()
     fact_service = service.get_fact_service()
+    web_search_service = service.get_web_search_service()
     news_service = create_news_service()
     reminders_service = create_reminders_service()
 
@@ -438,6 +441,29 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             except Exception as e:
                 console.print(f"\n[red]Error fetching news:[/red] {e}\n")
             continue
+        if lowered.startswith("/search"):
+            query = question[len("/search"):].strip()
+            if not query:
+                console.print("\n[yellow]Usage:[/yellow] /search <query>\n")
+                continue
+            if not web_search_service:
+                console.print("\n[red]Web search is not configured.[/red]\n")
+                continue
+            try:
+                with thinking_spinner("searching the web..."):
+                    results = web_search_service.search(query)
+                if results:
+                    console.print(f"\n[bold cyan]━━━━━━ Web Search: {query} ━━━━━━[/bold cyan]\n")
+                    for i, r in enumerate(results, 1):
+                        console.print(f"[bold green][{i}][/bold green] [bold]{r.title}[/bold]")
+                        console.print(f"[blue underline]{r.url}[/blue underline]")
+                        console.print(f"[dim]{r.snippet[:200]}...[/dim]" if len(r.snippet) > 200 else f"[dim]{r.snippet}[/dim]")
+                        console.print()
+                else:
+                    console.print(f"\n[dim]No results found for '{query}'.[/dim]\n")
+            except Exception as e:
+                console.print(f"\n[red]Error:[/red] {e}\n")
+            continue
         if lowered == "/todo" or lowered.startswith("/todo "):
             task_input = question[len("/todo"):].strip()
             if not task_input:
@@ -482,8 +508,12 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
         console.print(result.answer)
         console.print()
 
-        if result.news_sources or (result.sources_used and result.sources):
+        if result.web_sources or result.news_sources or (result.sources_used and result.sources):
             console.print("[bold cyan]─ Sources ─[/bold cyan]")
+            if result.web_sources:
+                for i, source in enumerate(result.web_sources, 1):
+                    console.print(f"[green]🌐 [{i}][/green] {source['title']}")
+                    console.print(f"    [blue underline]{source['url']}[/blue underline]")
             if result.news_sources:
                 for i, source in enumerate(result.news_sources, 1):
                     console.print(f"[yellow]📰 [{i}][/yellow] {source['title']}")

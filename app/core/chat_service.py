@@ -4,10 +4,11 @@ from typing import List, Optional
 
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
-from app.core.news_service import NewsService, NewsArticle
-from app.core.reminders_service import RemindersService
+from app.services.news_service import NewsService, NewsArticle
+from app.services.reminders_service import RemindersService
 from app.core.tool_executor import ToolExecutor
 from app.core.tools import ToolRegistry
+from app.services.web_search_service import WebSearchService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
 from app.retrieval.retriever import Retriever, RetrievalResult
@@ -49,6 +50,7 @@ class ChatService:
         fact_service: Optional[FactService] = None,
         news_service: Optional[NewsService] = None,
         reminders_service: Optional[RemindersService] = None,
+        web_search_service: Optional[WebSearchService] = None,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sage",
         enable_tools: bool = True,
@@ -59,6 +61,7 @@ class ChatService:
         self._fact_service = fact_service
         self._news_service = news_service
         self._reminders_service = reminders_service
+        self._web_search_service = web_search_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
         self._enable_tools = enable_tools
@@ -69,6 +72,7 @@ class ChatService:
             fact_service=fact_service,
             reminders_service=reminders_service,
             retriever=retriever,
+            web_search_service=web_search_service,
         )
         self._tool_executor = ToolExecutor(self._tool_registry)
 
@@ -168,6 +172,7 @@ class ChatService:
         # Tool-calling loop
         answer = ""
         news_articles: List[NewsArticle] = []
+        web_sources: List[dict] = []
         chunks = []
         sources = []
         retrieval = RetrievalResult(question=question, chunks=[], top_k=0)
@@ -198,6 +203,11 @@ class ChatService:
                         )
                         if fetched_articles:
                             news_articles.extend(fetched_articles)
+
+                    # Track web search results if web_search was called
+                    if tool_result.tool_name == "web_search":
+                        raw = tool_result.result.get("raw_results", [])
+                        web_sources.extend(raw)
 
                     tool_output_msg = f"Tool result for {tool_result.tool_name}:\n{tool_result.output}"
                     messages.append({"role": "assistant", "content": response})
@@ -262,8 +272,8 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
-        # Sources are used if we have news articles or document chunks
-        sources_used = bool(news_articles or chunks)
+        # Sources are used if we have news articles, web results, or document chunks
+        sources_used = bool(news_articles or web_sources or chunks)
         return QAResult(
             question=question,
             answer=answer,
@@ -272,6 +282,7 @@ class ChatService:
             prompt="",
             sources_used=sources_used,
             news_sources=[{"title": a.title, "source": a.source, "url": a.url} for a in news_articles],
+            web_sources=web_sources,
         )
 
     def create_session(self, session_id: str, title: str = "") -> None:
@@ -309,3 +320,7 @@ class ChatService:
     def get_fact_service(self) -> Optional[FactService]:
         """Get the fact service for external use."""
         return self._fact_service
+
+    def get_web_search_service(self) -> Optional[WebSearchService]:
+        """Get the web search service for external use."""
+        return self._web_search_service

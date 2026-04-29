@@ -7,9 +7,10 @@ from app.config import get_settings
 from app.core.analytics_service import AnalyticsService
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
-from app.core.news_service import NewsService
 from app.core.qa_service import QAService
-from app.core.reminders_service import RemindersService
+from app.services.news_service import NewsService
+from app.services.reminders_service import RemindersService
+from app.services.web_search_service import WebSearchService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaEmbeddingsProvider, OllamaProviderError
@@ -57,6 +58,15 @@ def create_reminders_service() -> RemindersService:
     return RemindersService(default_list_name=settings.reminders_default_list)
 
 
+def create_web_search_service() -> WebSearchService:
+    settings = get_settings()
+    return WebSearchService(
+        api_key=settings.tavily_api_key or None,
+        provider=settings.web_search_provider,
+        max_results=settings.web_search_max_results,
+    )
+
+
 def create_analytics_service() -> AnalyticsService:
     settings = get_settings()
     paths = settings.resolve_paths()
@@ -84,6 +94,7 @@ def create_chat_service() -> ChatService:
     fact_service = create_fact_service()
     news_service = create_news_service()
     reminders_service = create_reminders_service()
+    web_search_service = create_web_search_service()
     return ChatService(
         retriever=retriever,
         chat_provider=chat_provider,
@@ -91,6 +102,7 @@ def create_chat_service() -> ChatService:
         fact_service=fact_service,
         news_service=news_service,
         reminders_service=reminders_service,
+        web_search_service=web_search_service,
         assistant_name=settings.assistant_name,
         enable_tools=True,
     )
