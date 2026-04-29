@@ -67,7 +67,15 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Fact insights** — review learned facts by category
 - **Dashboard view** — `/analytics` command for visual stats
 
-### **9. Gmail Email Triage** 📧
+### **9. Web Search** 🌐
+- **Live web answers** — ask factual questions and get current, cited answers from the web
+- **Automatic routing** — LLM decides when to use web search vs. RAG vs. news based on intent
+- **Tavily primary** — fast, LLM-optimized results (1,000 searches/month free)
+- **DuckDuckGo fallback** — works without an API key
+- **Cited responses** — every web result includes title and URL
+- **Explicit shortcut** — `/search <query>` to always hit the web directly
+
+### **10. Gmail Email Triage** 📧
 - **Fetch personal inbox** — pulls recent primary-tab emails via Gmail API
 - **AI-powered triage** — classifies each email as ACTION, FYI, or IGNORE
 - **Actionable summary** — surfaces what needs a reply or decision
@@ -75,7 +83,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Standalone command** — `sage email-personal` for a quick triage outside chat
 - **Filters automatically** — skips promotions, social, updates, and forums
 
-### **10. Configuration & Customization** ⚙️
+### **11. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
@@ -90,20 +98,23 @@ Sage uses **open source Ollama models with tool calling** — the model understa
 
 **The Flow:**
 1. **You ask naturally:** "What's the news on Tesla?" or "Remember that I like coffee"
-2. **Model understands intent:** Identifies that it needs to fetch news or save a fact
+2. **Model understands intent:** Identifies that it needs to fetch news, search the web, save a fact, etc.
 3. **Automatically calls tools:** Generates JSON with the tool name and parameters
-4. **Tools execute:** Fetches news, saves facts, adds todos, searches documents
+4. **Tools execute:** Fetches news, searches the web, saves facts, adds todos, searches documents
 5. **Model responds:** Incorporates tool results into a natural response
 
 **No `/commands` required** — but they still work as shortcuts if you prefer them.
 
 Example:
 ```
-you: What's happening with SpaceX and can you add it to my reminders?
-Sage: I'll fetch the latest news and add it to your reminders.
-[Tool: fetch_news(query="SpaceX")]
-[Tool: add_todo(task="Check SpaceX update", due_date="today")]
-→ Found 5 articles about SpaceX... I've also added a reminder for you.
+you: What is LangGraph and can you add it to my reminders?
+Sage: I'll search the web and add a reminder.
+[Tool: web_search(query="What is LangGraph")]
+[Tool: add_todo(task="Learn LangGraph", due_date="today")]
+→ According to [1], LangGraph is a framework for building stateful multi-agent workflows...
+
+web sources:
+- [1] LangGraph Docs — https://langchain-ai.github.io/langgraph/
 ```
 
 ---
@@ -181,6 +192,7 @@ sage --resume <session-id>  # Shortcut
 | `/forget <fact-id>` | Delete a fact |
 | `/email` | Check personal email and triage action items |
 | `/news [query]` | Fetch live news |
+| `/search <query>` | Search the web for current information |
 | `/todo <task> [#list] [@due]` | Add a task to Apple Reminders (with optional list & date/time) |
 | `exit` or `quit` | Exit chat |
 
@@ -270,6 +282,24 @@ you : /todo Meeting #Work @next Tuesday at 3pm
 
 you : /todo Planning #Work Projects @next Friday at 10am
 ✓ Added todo to Work Projects: Planning due Fri, Apr 11 at 10:00AM
+```
+
+**Search the web:**
+```
+you : /search What is LangGraph?
+━━━━━━ Web Search: What is LangGraph? ━━━━━━
+
+[1] What is LangGraph - GeeksforGeeks
+    https://www.geeksforgeeks.org/machine-learning/what-is-langgraph/
+    LangGraph is a library for building stateful, multi-actor applications with LLMs...
+
+[2] LangGraph: Agent Orchestration Framework — LangChain
+    https://www.langchain.com/langgraph
+    LangGraph is a low-level orchestration framework for building agents...
+
+# Or ask naturally — Sage picks the right tool automatically:
+you : Who won the 2024 US election?
+# → Sage calls web_search automatically, returns a cited answer
 ```
 
 **Triage your email:**
@@ -474,6 +504,11 @@ RETRIEVAL_TOP_K=5
 NEWS_MAX_RESULTS=5
 EMAIL_MAX_RESULTS=20
 
+# Web Search
+TAVILY_API_KEY=              # Optional — falls back to DuckDuckGo if not set
+WEB_SEARCH_MAX_RESULTS=5
+WEB_SEARCH_PROVIDER=tavily  # "tavily" | "duckduckgo"
+
 # Personality
 ASSISTANT_NAME=Sage
 
@@ -515,22 +550,28 @@ User Input
 Pattern Detection
     ├─ Conversational? (greeting, meta-question)
     │  └→ No RAG retrieval, just chat
-    ├─ News query? ("news on X", "what happened to Y")
-    │  └→ Fetch live news, inject context
-    ├─ Has cached news context?
-    │  └→ Re-inject articles, continue conversation
-    └─ Document question?
-       └→ RAG retrieval, cite sources
+    ├─ /search <query>?
+    │  └→ Always web search, display results
+    ├─ /news <topic>?
+    │  └→ Always NewsService, display articles
+    └─ Everything else → LLM with tools available
+    ↓
+Tool-Calling Loop (LLM decides)
+    ├─ web_search  → live web results (🌐)
+    ├─ fetch_news  → live news articles (📰)
+    ├─ add_todo    → Apple Reminders
+    ├─ remember_fact / list_facts → personal memory
+    └─ search_documents → RAG retrieval (📄)
     ↓
 Inject Context
     ├─ Learned facts (personal + work)
-    ├─ Retrieved documents (if applicable)
-    ├─ Live news articles (if applicable)
+    ├─ Tool results (web, news, documents)
     └─ Conversation history
     ↓
 LLM Response (Ollama)
     ↓
 Display with Citations
+    ├─ Web sources (🌐)
     ├─ News sources (📰)
     └─ Document sources (📄)
     ↓
@@ -602,6 +643,7 @@ you : Tell me about payment systems in the book
 | Component | Purpose |
 |-----------|---------|
 | **ChatService** | Manages sessions, routing, context injection |
+| **WebSearchService** | Live web search via Tavily or DuckDuckGo |
 | **FactService** | Stores and retrieves learned facts |
 | **NewsService** | Fetches live news from Google News RSS |
 | **EmailService** | Gmail fetch and AI triage |
@@ -632,6 +674,7 @@ data/
 | Query Type | Time | Notes |
 |-----------|------|-------|
 | Conversational | <100ms | No RAG overhead |
+| Web search | 1-3s | Tavily or DuckDuckGo + LLM |
 | News query | 2-3s | Web fetch + LLM |
 | Document search | 1-2s | Embedding + retrieval + LLM |
 | Follow-up (cached news) | 1-2s | Uses cached articles |
@@ -711,6 +754,11 @@ RETRIEVAL_TOP_K=5           # Documents to retrieve
 NEWS_MAX_RESULTS=5          # News articles to fetch
 EMAIL_MAX_RESULTS=20        # Emails to fetch per triage
 
+# Web Search
+TAVILY_API_KEY=             # Get a free key at app.tavily.com (1,000 req/month)
+WEB_SEARCH_MAX_RESULTS=5    # Max results per search
+WEB_SEARCH_PROVIDER=tavily  # "tavily" | "duckduckgo" (fallback if key absent)
+
 # Reminders (macOS)
 REMINDERS_DEFAULT_LIST=Reminders  # Default Reminders list for /todo
 
@@ -737,8 +785,12 @@ DATA_DIR=./data             # Where to store data
 - [x] Apple Reminders integration
 - [x] Conversation analytics dashboard
 - [x] Gmail email triage (personal inbox)
+- [x] Web search (Tavily + DuckDuckGo fallback)
 
 ### 🚀 Upcoming
+- [ ] WhatsApp integration (text + voice notes)
+- [ ] Habit tracker with streaks and reminders
+- [ ] Proactive morning briefings via WhatsApp
 - [ ] Fact verification against documents
 - [ ] Automatic fact extraction from responses
 - [ ] Semantic fact linking & inference
