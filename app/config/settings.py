@@ -24,6 +24,7 @@ class Settings(BaseModel):
     news_max_results: int = Field(default=5, gt=0)
     email_max_results: int = Field(default=20, gt=0)
     reminders_default_list: str = "Reminders"
+    habit_default_reminder_time: str = "21:00"
 
     tavily_api_key: str = ""
     web_search_max_results: int = Field(default=5, gt=0)

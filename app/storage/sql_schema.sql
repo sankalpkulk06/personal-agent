@@ -74,3 +74,22 @@ CREATE TABLE IF NOT EXISTS whatsapp_sessions (
     last_active   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS habits (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL COLLATE NOCASE,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reminder_time   TEXT DEFAULT '21:00',
+    active          INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS habit_logs (
+    id          TEXT PRIMARY KEY,
+    habit_id    TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+    logged_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status      TEXT DEFAULT 'done',
+    note        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_id ON habit_logs(habit_id);
+CREATE INDEX IF NOT EXISTS idx_habit_logs_logged_at ON habit_logs(logged_at);
+

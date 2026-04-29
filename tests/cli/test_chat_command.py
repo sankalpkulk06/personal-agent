@@ -33,6 +33,27 @@ class _StubFactService:
         return None
 
 
+class _StubRegistry:
+    """Minimal registry stub for HabitService initialization in tests."""
+    class _conn:
+        row_factory = None
+
+        @staticmethod
+        def execute(sql, params=()):
+            class _cur:
+                def fetchone(self):
+                    return None
+                def fetchall(self):
+                    return []
+            return _cur()
+
+        @staticmethod
+        def commit():
+            pass
+
+    _connection = _conn()
+
+
 class _StubChatService:
     def __init__(self, result: QAResult):
         self._result = result
@@ -47,6 +68,9 @@ class _StubChatService:
 
     def get_web_search_service(self):
         return None
+
+    def get_registry(self):
+        return _StubRegistry()
 
     def list_sessions(self, limit=10):
         return []

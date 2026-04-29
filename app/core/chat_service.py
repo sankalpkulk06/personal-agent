@@ -324,3 +324,7 @@ class ChatService:
     def get_web_search_service(self) -> Optional[WebSearchService]:
         """Get the web search service for external use."""
         return self._web_search_service
+
+    def get_registry(self) -> SQLiteRegistry:
+        """Get the registry for external use."""
+        return self._registry

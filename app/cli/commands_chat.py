@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -20,6 +21,7 @@ from app.cli.commands_ask import (
     create_web_search_service,
 )
 from app.config import get_settings
+from app.core.habit_service import HabitService
 from app.services.email_service import EmailService
 from app.services.reminders_service import RemindersServiceError
 from app.providers.ollama_chat import OllamaChatProvider
@@ -242,6 +244,50 @@ def _print_analytics_dashboard(stats) -> None:
     console.print()
 
 
+def _parse_habit_reminder_time(args: str) -> tuple[str, str]:
+    """Split '/habit add <name> [@<time>]' into (name, reminder_time)."""
+    match = re.search(r"@(\S+)", args)
+    if match:
+        time_str = match.group(1)
+        name = args[: match.start()].strip()
+        return name, time_str
+    return args.strip(), "21:00"
+
+
+def _format_weekly_summary(summaries) -> str:
+    from datetime import date
+    today = date.today()
+    week_label = today.strftime("Week of %b %-d, %Y")
+    lines = [f"\n[bold cyan]📊 Habit Summary — {week_label}[/bold cyan]\n"]
+
+    if not summaries:
+        lines.append("  [dim]No habits tracked yet. Add one with[/dim] [bold]/habit add <name>[/bold]\n")
+        return "\n".join(lines)
+
+    total_done = 0
+    total_possible = len(summaries) * 7
+
+    for s in summaries:
+        filled = round(s.days_done / 7 * 10)
+        bar = "█" * filled + "░" * (10 - filled)
+        total_done += s.days_done
+
+        if s.streak > 0 and s.logged_today:
+            streak_label = f"[bold yellow]🔥 {s.streak}-day streak[/bold yellow]"
+        elif s.streak > 0:
+            streak_label = f"[yellow]🔥 {s.streak}-day streak[/yellow]"
+        else:
+            streak_label = "[red]❌ streak broken[/red]"
+
+        lines.append(
+            f"  [bold]{s.habit.name:<14}[/bold] [green]{bar}[/green]   "
+            f"[dim]{s.days_done}/7 days[/dim]   {streak_label}"
+        )
+
+    lines.append(f"\n[dim]Total logged this week: {total_done}/{total_possible}[/dim]\n")
+    return "\n".join(lines)
+
+
 def _print_help() -> None:
     console.print("\n[bold cyan]━━━━━━━━━━ Available Commands ━━━━━━━━━━[/bold cyan]")
     console.print()
@@ -259,6 +305,10 @@ def _print_help() -> None:
         ("/news [query]", "Fetch live news"),
         ("/search <query>", "Search the web for current information"),
         ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
+        ("/habit add <name> [@time]", "Track a new habit (optional reminder time)"),
+        ("/habit log <name> [skipped]", "Log a habit as done or skipped"),
+        ("/habit delete <name>", "Stop tracking a habit"),
+        ("/habits", "Show weekly habit summary with streaks"),
         ("exit | quit", "Exit chat mode"),
     ]
     for cmd, desc in commands:
@@ -273,6 +323,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     web_search_service = service.get_web_search_service()
     news_service = create_news_service()
     reminders_service = create_reminders_service()
+    habit_service = HabitService(service.get_registry())
 
     # Create chat provider for news summary generation
     settings = get_settings()
@@ -463,6 +514,55 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                     console.print(f"\n[dim]No results found for '{query}'.[/dim]\n")
             except Exception as e:
                 console.print(f"\n[red]Error:[/red] {e}\n")
+            continue
+        if lowered == "/habits":
+            summaries = habit_service.get_weekly_summary()
+            console.print(_format_weekly_summary(summaries))
+            continue
+        if lowered.startswith("/habit add "):
+            args = question[len("/habit add "):].strip()
+            if not args:
+                console.print("\n[yellow]Usage:[/yellow] /habit add <name> [@time]\n")
+                continue
+            name, reminder_time = _parse_habit_reminder_time(args)
+            if not name:
+                console.print("\n[yellow]Usage:[/yellow] /habit add <name> [@time]\n")
+                continue
+            habit = habit_service.add_habit(name=name, reminder_time=reminder_time)
+            console.print(f"\n[green]✓[/green] Habit [bold]{habit.name}[/bold] added (reminder at {habit.reminder_time})\n")
+            continue
+        if lowered.startswith("/habit log "):
+            args = question[len("/habit log "):].strip()
+            parts = args.split(None, 1)
+            name = parts[0] if parts else ""
+            status = "skipped" if len(parts) > 1 and parts[1].strip().lower() == "skipped" else "done"
+            if not name:
+                console.print("\n[yellow]Usage:[/yellow] /habit log <name> [skipped]\n")
+                continue
+            try:
+                log = habit_service.log_habit(name=name, status=status)
+                verb = "skipped" if log.status == "skipped" else "logged"
+                console.print(f"\n[green]✓[/green] Habit [bold]{name}[/bold] {verb} for today\n")
+            except ValueError as exc:
+                console.print(f"\n[red]✗[/red] {exc}\n")
+            continue
+        if lowered.startswith("/habit delete "):
+            name = question[len("/habit delete "):].strip()
+            if not name:
+                console.print("\n[yellow]Usage:[/yellow] /habit delete <name>\n")
+                continue
+            deleted = habit_service.delete_habit(name)
+            if deleted:
+                console.print(f"\n[green]✓[/green] Habit [bold]{name}[/bold] removed\n")
+            else:
+                console.print(f"\n[red]✗[/red] Habit '{name}' not found\n")
+            continue
+        if lowered.startswith("/habit"):
+            console.print("\n[yellow]Habit commands:[/yellow]")
+            console.print("  [bold]/habit add <name> [@time][/bold]  — start tracking a habit")
+            console.print("  [bold]/habit log <name> [skipped][/bold] — mark done or skipped")
+            console.print("  [bold]/habit delete <name>[/bold]         — stop tracking")
+            console.print("  [bold]/habits[/bold]                       — weekly summary\n")
             continue
         if lowered == "/todo" or lowered.startswith("/todo "):
             task_input = question[len("/todo"):].strip()
