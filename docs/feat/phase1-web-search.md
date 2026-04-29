@@ -2,7 +2,7 @@
 
 **Est. effort:** 3–4 days  
 **Dependencies:** None — fully independent  
-**Status:** Not started
+**Status:** Completed
 
 ---
 
@@ -14,16 +14,24 @@ Register a `web_search` tool alongside the existing `fetch_news` tool so the LLM
 
 ## New Files
 
-- `app/core/web_search_service.py`
+- `app/services/web_search_service.py` *(moved to `services/` during refactor)*
 
 ## Modified Files
 
-- `app/core/tools.py` — register `web_search` tool definition
-- `app/core/tool_executor.py` — add `web_search` execution handler
-- `app/core/chat_service.py` — inject `WebSearchService`; add `WEB_SEARCH_PATTERNS` routing + `/search` command handler
-- `app/config/settings.py` — add `TAVILY_API_KEY`, `WEB_SEARCH_MAX_RESULTS`, `WEB_SEARCH_PROVIDER`
-- `pyproject.toml` / `setup.py` — add `tavily-python`, `duckduckgo-search`
-- `.env.example` — document new env vars
+- `app/core/tools.py` — added `WebSearchTool` class + `web_search_service` param to `ToolRegistry`
+- `app/core/chat_service.py` — injected `WebSearchService`; tracks `web_sources` from tool calls; `/search` command handler
+- `app/core/qa_service.py` — added `web_sources: List[dict]` field to `QAResult`
+- `app/cli/commands_ask.py` — added `create_web_search_service()` factory; wired into `create_chat_service()`
+- `app/cli/commands_chat.py` — `/search` command display + web sources (🌐) in chat output
+- `app/config/settings.py` — added `TAVILY_API_KEY`, `WEB_SEARCH_MAX_RESULTS`, `WEB_SEARCH_PROVIDER`
+- `requirements.txt` — added `tavily-python`, `ddgs` *(duckduckgo-search was renamed to ddgs)*
+- `tests/cli/test_chat_command.py` — added `get_web_search_service()` to stub
+
+## Deviations from Plan
+
+- **`app/services/` not `app/core/`** — file landed in `services/` after the external-integrations refactor; correct location per the new layout
+- **`WEB_SEARCH_PATTERNS` not added** — the existing tool-calling loop already routes factual queries to `web_search` automatically; a separate pattern list was redundant
+- **`tool_executor.py` unchanged** — tool execution is handled generically by `ToolRegistry.execute_tool()`; no per-tool case needed
 
 ---
 
@@ -58,9 +66,9 @@ class WebSearchService:
   ```
 
 **AC:**
-- [ ] `search()` returns up to `max_results` results from Tavily when key is set
-- [ ] Falls back to DuckDuckGo when `TAVILY_API_KEY` is absent or provider is `"duckduckgo"`
-- [ ] `format_for_context()` produces numbered citation output
+- [x] `search()` returns up to `max_results` results from Tavily when key is set
+- [x] Falls back to DuckDuckGo when `TAVILY_API_KEY` is absent or provider is `"duckduckgo"`
+- [x] `format_for_context()` produces numbered citation output
 
 ---
 
@@ -94,8 +102,8 @@ elif tool_name == "web_search":
 ```
 
 **AC:**
-- [ ] `web_search` appears in the tools list sent to the LLM
-- [ ] LLM can invoke it; `ToolExecutor` executes it and returns formatted results
+- [x] `web_search` appears in the tools list sent to the LLM
+- [x] LLM can invoke it; `ToolExecutor` executes it and returns formatted results
 
 ---
 
@@ -115,9 +123,9 @@ Routing priority (from most to least specific):
 4. Everything else → LLM decides (tools available)
 
 **AC:**
-- [ ] `sage ask "What is LangGraph?"` returns a web-grounded answer with citations
-- [ ] `/search rust tutorial` works in both `sage chat` and `sage ask` modes
-- [ ] `/news AI` still uses NewsService as before
+- [x] `sage ask "What is LangGraph?"` returns a web-grounded answer with citations
+- [x] `/search rust tutorial` works in both `sage chat` and `sage ask` modes
+- [x] `/news AI` still uses NewsService as before
 
 ---
 
@@ -140,8 +148,8 @@ WEB_SEARCH_PROVIDER=tavily
 ```
 
 **AC:**
-- [ ] App starts without `TAVILY_API_KEY` set (falls back to DuckDuckGo)
-- [ ] Setting `WEB_SEARCH_PROVIDER=duckduckgo` forces DuckDuckGo even if key exists
+- [x] App starts without `TAVILY_API_KEY` set (falls back to DuckDuckGo)
+- [x] Setting `WEB_SEARCH_PROVIDER=duckduckgo` forces DuckDuckGo even if key exists
 
 ---
 
@@ -155,8 +163,8 @@ duckduckgo-search>=6.0
 ```
 
 **AC:**
-- [ ] `pip install -e .` installs both packages
-- [ ] Both imports succeed in a fresh venv
+- [x] `pip install -e .` installs both packages
+- [x] Both imports succeed in a fresh venv
 
 ---
 
@@ -176,10 +184,10 @@ web sources:
 
 ## Acceptance Criteria (phase complete)
 
-- [ ] `WebSearchService.search()` returns results from Tavily or DuckDuckGo
-- [ ] `web_search` registered as callable tool in `ChatService`
-- [ ] LLM routes factual questions to web search vs. RAG vs. news correctly
-- [ ] Results cited with title + URL in response
-- [ ] Works in both `sage chat` and `sage ask` modes
-- [ ] Falls back to DuckDuckGo when Tavily key not set
-- [ ] `/search <query>` command works as explicit shortcut
+- [x] `WebSearchService.search()` returns results from Tavily or DuckDuckGo
+- [x] `web_search` registered as callable tool in `ChatService`
+- [x] LLM routes factual questions to web search vs. RAG vs. news correctly
+- [x] Results cited with title + URL in response
+- [x] Works in both `sage chat` and `sage ask` modes
+- [x] Falls back to DuckDuckGo when Tavily key not set
+- [x] `/search <query>` command works as explicit shortcut

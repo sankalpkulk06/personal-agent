@@ -11,7 +11,7 @@ Five phases that evolve Sage from a local CLI chatbot into a proactive personal 
 
 | Phase | Feature | Est. Effort | Status |
 |-------|---------|-------------|--------|
-| 1 | [Web Search](phase1-web-search.md) | 3–4 days | Not started |
+| 1 | [Web Search](phase1-web-search.md) | 3–4 days | Completed |
 | 2 | [WhatsApp Text](phase2-whatsapp-text.md) | 4–5 days | Not started |
 | 3 | [Habit Tracker CLI](phase3-habit-tracker.md) | 3–4 days | Not started |
 | 4 | [Scheduler & Proactive Reminders](phase4-scheduler-reminders.md) | 4–5 days | Not started |
