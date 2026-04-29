@@ -5,6 +5,7 @@ import typer
 
 from app import __version__
 from app.cli.commands_chat import chat_command
+from app.cli.commands_email import email_personal_command, email_work_command
 from app.config import get_settings
 from app.cli.commands_ask import ask_command
 from app.cli.commands_ingest import ingest_command
@@ -67,3 +68,19 @@ def chat(
     resume: Optional[str] = typer.Option(None, "--resume", help="Resume a previous chat session by ID."),
 ) -> None:
     chat_command(top_k=top_k, session_id=resume)
+
+
+@cli.command("email-personal")
+def email_personal(
+    max_results: Optional[int] = typer.Option(None, "--max-results", "-n", help="Max emails to fetch."),
+    no_triage: bool = typer.Option(False, "--no-triage", help="Skip AI triage, list emails only."),
+) -> None:
+    email_personal_command(max_results=max_results, no_triage=no_triage)
+
+
+@cli.command("email-work")
+def email_work(
+    max_results: Optional[int] = typer.Option(None, "--max-results", "-n", help="Max emails to fetch."),
+    no_triage: bool = typer.Option(False, "--no-triage", help="Skip AI triage, list emails only."),
+) -> None:
+    email_work_command(max_results=max_results, no_triage=no_triage)

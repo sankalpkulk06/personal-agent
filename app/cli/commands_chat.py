@@ -19,10 +19,83 @@ from app.cli.commands_ask import (
     create_reminders_service,
 )
 from app.config import get_settings
+from app.core.email_service import EmailService
 from app.core.reminders_service import RemindersServiceError
 from app.providers.ollama_chat import OllamaChatProvider
 from app.providers.ollama_embeddings import OllamaProviderError
 from app.ui.spinner import thinking_spinner
+
+_EMAIL_TRIGGERS = {
+    "check my email", "check email", "any emails", "any email",
+    "show my email", "show email", "read my email", "read email",
+    "email inbox", "check inbox", "what emails", "do i have email",
+    "email triage", "triage email", "triage my email",
+}
+_EMAIL_ACTION_WORDS = {"check", "any", "show", "read", "triage", "fetch", "get", "what", "action"}
+
+
+def _is_email_request(text: str) -> bool:
+    t = text.lower()
+    if t in _EMAIL_TRIGGERS:
+        return True
+    if ("email" in t or "inbox" in t) and any(w in t for w in _EMAIL_ACTION_WORDS):
+        return True
+    return False
+
+
+def _handle_email_personal(console: Console, settings) -> None:
+    paths = settings.resolve_paths()
+    service = EmailService(credentials_dir=paths.credentials_dir, account_type="personal")
+    chat_provider = OllamaChatProvider(base_url=settings.ollama_base_url, model=settings.ollama_chat_model)
+
+    try:
+        with thinking_spinner("fetching personal emails..."):
+            emails = service.fetch_recent(max_results=settings.email_max_results)
+    except FileNotFoundError as exc:
+        console.print(f"\n[red]Setup required:[/red] {exc}\n")
+        return
+    except Exception as exc:
+        console.print(f"\n[red]Error fetching emails:[/red] {exc}\n")
+        return
+
+    console.print()
+    console.print("[bold cyan]╭─ Personal Email ─╮[/bold cyan]")
+    console.print()
+
+    if not emails:
+        console.print("[dim]No emails found.[/dim]")
+        console.print()
+        return
+
+    try:
+        with thinking_spinner("triaging with AI..."):
+            triaged = service.triage(emails, chat_provider)
+    except Exception as exc:
+        console.print(f"\n[red]Error during triage:[/red] {exc}\n")
+        return
+
+    action_items = [t for t in triaged if t.category == "action"]
+    fyi_items = [t for t in triaged if t.category == "fyi"]
+
+    if action_items:
+        console.print(f"[bold red]ACTION NEEDED ({len(action_items)})[/bold red]")
+        for i, item in enumerate(action_items, 1):
+            console.print(f"  [dim]{i}.[/dim] [bold]{item.email.sender}[/bold] — {item.email.subject}")
+            console.print(f"     [red]→[/red] {item.reason}")
+        console.print()
+    else:
+        console.print("[dim]No action needed.[/dim]")
+        console.print()
+
+    if fyi_items:
+        console.print(f"[bold yellow]FYI ({len(fyi_items)})[/bold yellow]")
+        for i, item in enumerate(fyi_items, 1):
+            console.print(f"  [dim]{i}.[/dim] [bold]{item.email.sender}[/bold] — {item.email.subject}")
+            console.print(f"     [yellow]→[/yellow] {item.reason}")
+        console.print()
+
+    console.print("[bold cyan]╰──────────────────╯[/bold cyan]")
+    console.print()
 
 console = Console()
 
@@ -181,6 +254,7 @@ def _print_help() -> None:
         ("/remember-work <fact>", "Remember a work fact"),
         ("/facts [category]", "List facts (personal|work)"),
         ("/forget <fact-id>", "Delete a fact"),
+        ("/email", "Check personal email and triage action items"),
         ("/news [query]", "Fetch live news"),
         ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("exit | quit", "Exit chat mode"),
@@ -327,6 +401,9 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                 console.print(f"\n[green]✓[/green] Fact forgotten\n")
             except Exception as e:
                 console.print(f"\n[red]✗[/red] Error: {e}\n")
+            continue
+        if lowered in ("/email", "/email-personal") or _is_email_request(lowered):
+            _handle_email_personal(console, settings)
             continue
         if lowered.startswith("/news"):
             query = question[len("/news"):].strip()

@@ -12,9 +12,10 @@ class AppPaths(BaseModel):
     sqlite_db_path: Path
     cache_dir: Path
     reports_dir: Path
+    credentials_dir: Path
 
     def ensure_directories(self) -> None:
-        for directory in (self.data_dir, self.chroma_dir, self.sqlite_dir, self.cache_dir, self.reports_dir):
+        for directory in (self.data_dir, self.chroma_dir, self.sqlite_dir, self.cache_dir, self.reports_dir, self.credentials_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
 
@@ -30,6 +31,7 @@ def build_paths(project_root: Path, data_dir: Optional[Path] = None) -> AppPaths
         sqlite_db_path=(resolved_data_dir / "sqlite" / "registry.db"),
         cache_dir=resolved_data_dir / "cache",
         reports_dir=resolved_data_dir / "reports",
+        credentials_dir=resolved_data_dir / "credentials",
     )
     paths.ensure_directories()
     return paths
