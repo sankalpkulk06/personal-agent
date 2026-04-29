@@ -659,6 +659,7 @@ DATA_DIR=./data             # Where to store data
 - [x] Conversation context
 - [x] Source citations
 - [x] Apple Reminders integration
+- [x] Conversation analytics dashboard
 
 ### 🚀 Upcoming
 - [ ] Fact verification against documents
