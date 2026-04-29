@@ -9,6 +9,7 @@ from app.cli.commands_email import email_personal_command, email_work_command
 from app.config import get_settings
 from app.cli.commands_ask import ask_command
 from app.cli.commands_ingest import ingest_command
+from app.cli.commands_serve import serve_command
 
 cli = typer.Typer(
     add_completion=False,
@@ -76,6 +77,15 @@ def email_personal(
     no_triage: bool = typer.Option(False, "--no-triage", help="Skip AI triage, list emails only."),
 ) -> None:
     email_personal_command(max_results=max_results, no_triage=no_triage)
+
+
+@cli.command("serve")
+def serve(
+    port: int = typer.Option(8000, help="Port to listen on"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for dev"),
+) -> None:
+    """Start the WhatsApp webhook server."""
+    serve_command(port=port, reload=reload)
 
 
 @cli.command("email-work")
