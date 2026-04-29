@@ -101,6 +101,19 @@ class HabitService:
         self._db.commit()
         return HabitLog(id=log_id, habit_id=habit.id, logged_at=now, status=status, note=note)
 
+    def unlog_habit(self, name: str) -> int:
+        """Delete all log entries for today for the given habit. Returns rows deleted."""
+        habit = self._get_habit_by_name(name)
+        if habit is None:
+            raise ValueError(f"Habit '{name}' not found.")
+        today = date.today().isoformat()
+        cursor = self._db.execute(
+            "DELETE FROM habit_logs WHERE habit_id = ? AND DATE(logged_at) = ?",
+            (habit.id, today),
+        )
+        self._db.commit()
+        return cursor.rowcount
+
     def delete_habit(self, name: str) -> bool:
         habit = self._get_habit_by_name(name)
         if habit is None:

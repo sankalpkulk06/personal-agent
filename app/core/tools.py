@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from app.core.fact_service import FactService
+from app.core.habit_service import HabitService
 from app.services.news_service import NewsService
 from app.services.reminders_service import RemindersService
 from app.services.web_search_service import WebSearchService
@@ -301,6 +302,48 @@ class WebSearchTool(Tool):
             return {"success": False, "error": f"Web search failed: {str(e)}"}
 
 
+class LogHabitTool(Tool):
+    """Log a habit as done or skipped for today."""
+
+    def __init__(self, habit_service: HabitService):
+        super().__init__(
+            name="log_habit",
+            description=(
+                "Log a tracked habit as done or skipped for today. "
+                "Use this when the user says they did something habitual like 'I went to the gym', "
+                "'I meditated today', 'log my reading habit', etc."
+            ),
+            parameters=[
+                ToolParameter(
+                    name="name",
+                    type="string",
+                    description="The habit name to log (e.g. 'gym', 'reading', 'meditation')",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="status",
+                    type="string",
+                    description="Whether the habit was completed: 'done' or 'skipped'",
+                    required=False,
+                    enum=["done", "skipped"],
+                ),
+            ],
+        )
+        self.habit_service = habit_service
+
+    def execute(self, name: str = "", status: str = "done", **kwargs) -> Dict[str, Any]:
+        try:
+            if not name:
+                return {"success": False, "error": "Habit name cannot be empty"}
+            log = self.habit_service.log_habit(name=name, status=status)
+            verb = "skipped" if log.status == "skipped" else "logged as done"
+            return {"success": True, "result": f"✓ Habit '{name}' {verb} for today"}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to log habit: {str(e)}"}
+
+
 class ToolRegistry:
     """Registry of all available tools."""
 
@@ -311,6 +354,7 @@ class ToolRegistry:
         reminders_service: Optional[RemindersService] = None,
         retriever: Optional[Retriever] = None,
         web_search_service: Optional[WebSearchService] = None,
+        habit_service: Optional[HabitService] = None,
     ):
         self.tools: Dict[str, Tool] = {}
 
@@ -325,6 +369,8 @@ class ToolRegistry:
             self.register(SearchDocumentsTool(retriever))
         if web_search_service:
             self.register(WebSearchTool(web_search_service))
+        if habit_service:
+            self.register(LogHabitTool(habit_service))
 
     def register(self, tool: Tool) -> None:
         """Register a tool."""

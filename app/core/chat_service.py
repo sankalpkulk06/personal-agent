@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
+from app.core.habit_service import HabitService
 from app.services.news_service import NewsService, NewsArticle
 from app.services.reminders_service import RemindersService
 from app.core.tool_executor import ToolExecutor
@@ -51,6 +52,7 @@ class ChatService:
         news_service: Optional[NewsService] = None,
         reminders_service: Optional[RemindersService] = None,
         web_search_service: Optional[WebSearchService] = None,
+        habit_service: Optional[HabitService] = None,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sage",
         enable_tools: bool = True,
@@ -62,6 +64,7 @@ class ChatService:
         self._news_service = news_service
         self._reminders_service = reminders_service
         self._web_search_service = web_search_service
+        self._habit_service = habit_service
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
         self._enable_tools = enable_tools
@@ -73,6 +76,7 @@ class ChatService:
             reminders_service=reminders_service,
             retriever=retriever,
             web_search_service=web_search_service,
+            habit_service=habit_service,
         )
         self._tool_executor = ToolExecutor(self._tool_registry)
 
@@ -328,3 +332,7 @@ class ChatService:
     def get_registry(self) -> SQLiteRegistry:
         """Get the registry for external use."""
         return self._registry
+
+    def get_habit_service(self) -> Optional[HabitService]:
+        """Get the habit service for external use."""
+        return self._habit_service

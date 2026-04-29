@@ -307,6 +307,7 @@ def _print_help() -> None:
         ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("/habit add <name> [@time]", "Track a new habit (optional reminder time)"),
         ("/habit log <name> [skipped]", "Log a habit as done or skipped"),
+        ("/habit unlog <name>", "Remove today's log entry for a habit"),
         ("/habit delete <name>", "Stop tracking a habit"),
         ("/habits", "Show weekly habit summary with streaks"),
         ("exit | quit", "Exit chat mode"),
@@ -323,7 +324,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     web_search_service = service.get_web_search_service()
     news_service = create_news_service()
     reminders_service = create_reminders_service()
-    habit_service = HabitService(service.get_registry())
+    habit_service = service.get_habit_service() or HabitService(service.get_registry())
 
     # Create chat provider for news summary generation
     settings = get_settings()
@@ -546,6 +547,20 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             except ValueError as exc:
                 console.print(f"\n[red]✗[/red] {exc}\n")
             continue
+        if lowered.startswith("/habit unlog "):
+            name = question[len("/habit unlog "):].strip()
+            if not name:
+                console.print("\n[yellow]Usage:[/yellow] /habit unlog <name>\n")
+                continue
+            try:
+                deleted = habit_service.unlog_habit(name)
+                if deleted:
+                    console.print(f"\n[green]✓[/green] Removed today's log for [bold]{name}[/bold]\n")
+                else:
+                    console.print(f"\n[dim]No log found for '{name}' today.[/dim]\n")
+            except ValueError as exc:
+                console.print(f"\n[red]✗[/red] {exc}\n")
+            continue
         if lowered.startswith("/habit delete "):
             name = question[len("/habit delete "):].strip()
             if not name:
@@ -561,6 +576,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             console.print("\n[yellow]Habit commands:[/yellow]")
             console.print("  [bold]/habit add <name> [@time][/bold]  — start tracking a habit")
             console.print("  [bold]/habit log <name> [skipped][/bold] — mark done or skipped")
+            console.print("  [bold]/habit unlog <name>[/bold]          — remove today's log")
             console.print("  [bold]/habit delete <name>[/bold]         — stop tracking")
             console.print("  [bold]/habits[/bold]                       — weekly summary\n")
             continue

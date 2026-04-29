@@ -69,6 +69,9 @@ class _StubChatService:
     def get_web_search_service(self):
         return None
 
+    def get_habit_service(self):
+        return None
+
     def get_registry(self):
         return _StubRegistry()
 
