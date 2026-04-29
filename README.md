@@ -67,12 +67,20 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Fact insights** — review learned facts by category
 - **Dashboard view** — `/analytics` command for visual stats
 
-### **9. Configuration & Customization** ⚙️
+### **9. Gmail Email Triage** 📧
+- **Fetch personal inbox** — pulls recent primary-tab emails via Gmail API
+- **AI-powered triage** — classifies each email as ACTION, FYI, or IGNORE
+- **Actionable summary** — surfaces what needs a reply or decision
+- **Chat-native** — type `/email` or just ask naturally ("check my email", "any emails to action?")
+- **Standalone command** — `sage email-personal` for a quick triage outside chat
+- **Filters automatically** — skips promotions, social, updates, and forums
+
+### **10. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
 - **Chunk size & overlap** — fine-tune document chunking
-- **Max results** — control news result count
+- **Max results** — control news and email result counts
 
 ---
 
@@ -171,6 +179,7 @@ sage --resume <session-id>  # Shortcut
 | `/remember-work <fact>` | Save a work fact |
 | `/facts [personal\|work]` | List learned facts |
 | `/forget <fact-id>` | Delete a fact |
+| `/email` | Check personal email and triage action items |
 | `/news [query]` | Fetch live news |
 | `/todo <task> [#list] [@due]` | Add a task to Apple Reminders (with optional list & date/time) |
 | `exit` or `quit` | Exit chat |
@@ -261,6 +270,28 @@ you : /todo Meeting #Work @next Tuesday at 3pm
 
 you : /todo Planning #Work Projects @next Friday at 10am
 ✓ Added todo to Work Projects: Planning due Fri, Apr 11 at 10:00AM
+```
+
+**Triage your email:**
+```
+you : check my email
+╭─ Personal Email ─╮
+
+ACTION NEEDED (2)
+  1. boss@company.com — Q2 planning doc needs your sign-off
+     → Requires a decision or reply from you
+  2. recruiter@startup.io — Following up on intro call
+     → Awaiting your response
+
+FYI (3)
+  1. github@github.com — Your PR was merged
+     → Informational, no action needed
+  ...
+
+╰──────────────────╯
+
+# Works with /email too
+you : /email
 ```
 
 **Manage facts:**
@@ -357,6 +388,19 @@ sage chat --resume <id>      # Resume session
 sage --resume <id>           # Quick resume
 ```
 
+### Email Triage
+
+```bash
+# Fetch and triage personal inbox
+sage email-personal
+
+# Skip AI triage, just list emails
+sage email-personal --no-triage
+
+# Limit results
+sage email-personal --max-results 10
+```
+
 ### Todo with Natural Language Dates and Custom Lists
 
 In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates and custom lists:
@@ -396,6 +440,20 @@ In chat mode, use `/todo` to add tasks to Apple Reminders with optional due date
 
 ---
 
+## 📧 Gmail Setup
+
+Email triage requires a Google Cloud OAuth 2.0 credential.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+2. Create an **OAuth 2.0 Client ID** (Desktop app)
+3. Download the JSON and save it as `data/credentials/credentials.json`
+4. On first run (`sage email-personal` or `/email` in chat), a browser window opens for Google sign-in
+5. The token is saved to `data/credentials/personal_token.json` — future runs are silent
+
+**Required API:** Enable **Gmail API** in your Google Cloud project.
+
+---
+
 ## ⚙️ Configuration
 
 ### Environment Variables (`.env`)
@@ -414,6 +472,7 @@ CHUNK_OVERLAP=120
 # Retrieval
 RETRIEVAL_TOP_K=5
 NEWS_MAX_RESULTS=5
+EMAIL_MAX_RESULTS=20
 
 # Personality
 ASSISTANT_NAME=Sage
@@ -545,6 +604,7 @@ you : Tell me about payment systems in the book
 | **ChatService** | Manages sessions, routing, context injection |
 | **FactService** | Stores and retrieves learned facts |
 | **NewsService** | Fetches live news from Google News RSS |
+| **EmailService** | Gmail fetch and AI triage |
 | **TodoService** | Adds tasks to macOS Reminders app |
 | **Retriever** | RAG retrieval with embeddings |
 | **OllamaChatProvider** | LLM interface to Ollama |
@@ -557,7 +617,10 @@ you : Tell me about payment systems in the book
 data/
 ├── sqlite/registry.db         # Sessions, facts, metadata
 ├── chroma/                    # Vector embeddings
-└── cache/                     # Temporary files
+├── cache/                     # Temporary files
+└── credentials/               # OAuth tokens (Gmail)
+    ├── credentials.json        # Google Cloud client secret (you provide)
+    └── personal_token.json     # Auto-generated after first Gmail auth
 ```
 
 ---
@@ -609,6 +672,18 @@ ollama list
 - Reduce `CHUNK_SIZE` in `.env`
 - Free up system RAM
 
+### Gmail credentials not found
+
+```bash
+# Ensure credentials.json is in place
+ls data/credentials/credentials.json
+
+# On first run, a browser window opens for Google sign-in
+sage email-personal
+```
+
+If the browser doesn't open, check that your Google Cloud project has the Gmail API enabled and the OAuth client is a Desktop app type.
+
 ### Chat feels slow
 
 - Reduce `RETRIEVAL_TOP_K` in `.env` (default: 5)
@@ -634,6 +709,7 @@ CHUNK_OVERLAP=120           # Overlap between chunks
 # Retrieval
 RETRIEVAL_TOP_K=5           # Documents to retrieve
 NEWS_MAX_RESULTS=5          # News articles to fetch
+EMAIL_MAX_RESULTS=20        # Emails to fetch per triage
 
 # Reminders (macOS)
 REMINDERS_DEFAULT_LIST=Reminders  # Default Reminders list for /todo
@@ -660,6 +736,7 @@ DATA_DIR=./data             # Where to store data
 - [x] Source citations
 - [x] Apple Reminders integration
 - [x] Conversation analytics dashboard
+- [x] Gmail email triage (personal inbox)
 
 ### 🚀 Upcoming
 - [ ] Fact verification against documents
