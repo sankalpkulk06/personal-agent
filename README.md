@@ -177,6 +177,47 @@ sage ingest --path "./my-documents"
 sage chat
 ```
 
+### Docker / Keep Sage Running
+
+Use Docker Compose to keep the WhatsApp webhook server, scheduler, and optional Ollama service running in the background.
+
+```bash
+# Build the Sage image
+docker compose build
+
+# Start Sage + Ollama in the background
+docker compose up -d
+
+# Pull the required models into the Ollama container
+docker compose exec ollama ollama pull nomic-embed-text
+docker compose exec ollama ollama pull llama3.2:3b
+
+# Watch logs
+docker compose logs -f sage
+
+# Stop services
+docker compose down
+```
+
+Your Sage state is mounted at `./data`, including SQLite, Chroma, reports, and Gmail OAuth tokens.
+
+If you already run Ollama on your Mac instead of in Docker:
+
+```bash
+docker compose -f docker-compose.host-ollama.yml up -d --build
+```
+
+Useful one-off commands:
+
+```bash
+docker compose run --rm sage sage config
+docker compose run --rm sage sage sources
+docker compose run --rm sage sage ingest --path /app/data/documents
+docker compose run --rm sage sage chat
+```
+
+Note: Linux containers cannot create native macOS Apple Reminders. Sage-owned SQLite reminders, WhatsApp delivery, Gmail triage, RAG, URL ingestion, and webhook serving still work in Docker.
+
 ---
 
 ## 💬 Interactive Chat Mode
