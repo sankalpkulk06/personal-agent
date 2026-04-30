@@ -8,9 +8,12 @@ from app.core.analytics_service import AnalyticsService
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
 from app.core.habit_service import HabitService
+from app.core.ingest_coordinator import IngestCoordinator
 from app.core.qa_service import QAService
+from app.ingestion.ingest_service import IngestService
 from app.services.news_service import NewsService
 from app.services.reminders_service import RemindersService
+from app.services.url_ingestion_service import URLIngestionService
 from app.services.web_search_service import WebSearchService
 from app.export.markdown_exporter import export_qa_to_markdown
 from app.providers.ollama_chat import OllamaChatProvider
@@ -68,6 +71,31 @@ def create_web_search_service() -> WebSearchService:
     )
 
 
+def create_url_ingestion_service(
+    registry: SQLiteRegistry,
+    chat_provider: OllamaChatProvider,
+) -> URLIngestionService:
+    settings = get_settings()
+    paths = settings.resolve_paths()
+    coordinator = IngestCoordinator(
+        ingest_service=IngestService(),
+        embeddings_provider=OllamaEmbeddingsProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_embedding_model,
+        ),
+        registry=registry,
+        vector_store=ChromaStore(paths.chroma_dir),
+    )
+    return URLIngestionService(
+        ingest_coordinator=coordinator,
+        registry=registry,
+        chat_provider=chat_provider,
+        timeout=settings.url_scrape_timeout,
+        min_words=settings.url_min_content_words,
+        max_words=settings.url_max_content_words,
+    )
+
+
 def create_analytics_service() -> AnalyticsService:
     settings = get_settings()
     paths = settings.resolve_paths()
@@ -99,6 +127,7 @@ def create_chat_service(
     reminders_service = create_reminders_service()
     web_search_service = create_web_search_service()
     habit_service = HabitService(registry)
+    url_ingestion_service = create_url_ingestion_service(registry, chat_provider) if settings.url_ingestion_enabled else None
     return ChatService(
         retriever=retriever,
         chat_provider=chat_provider,
@@ -108,6 +137,7 @@ def create_chat_service(
         reminders_service=reminders_service,
         web_search_service=web_search_service,
         habit_service=habit_service,
+        url_ingestion_service=url_ingestion_service,
         schedule_todo_callback=schedule_todo_callback,
         twilio_daily_message_limit=settings.twilio_daily_message_limit,
         assistant_name=settings.assistant_name,

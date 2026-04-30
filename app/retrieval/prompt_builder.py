@@ -1,7 +1,15 @@
 import json
 from typing import Any, List, Optional
+from urllib.parse import urlparse
 
 from app.retrieval.retriever import RetrievedChunk
+
+
+def _format_chunk_source(chunk: RetrievedChunk) -> str:
+    if chunk.source_type == "url" and chunk.source_url:
+        domain = urlparse(chunk.source_url).netloc
+        return f"{chunk.file_name} (from {domain})"
+    return chunk.file_name or chunk.source_path or chunk.document_id
 
 
 def build_grounded_prompt(question: str, chunks: List[RetrievedChunk], max_chunks: int = 5) -> str:
@@ -11,7 +19,7 @@ def build_grounded_prompt(question: str, chunks: List[RetrievedChunk], max_chunk
     else:
         lines = []
         for idx, chunk in enumerate(limited_chunks, start=1):
-            source = chunk.file_name or chunk.source_path or chunk.document_id
+            source = _format_chunk_source(chunk)
             lines.append(f"[{idx}] SOURCE={source}")
             lines.append("BEGIN_SNIPPET")
             lines.append(chunk.text.strip())
@@ -61,7 +69,7 @@ def build_chat_messages(
     if limited_chunks:
         lines = []
         for idx, chunk in enumerate(limited_chunks, start=1):
-            source = chunk.file_name or chunk.source_path or chunk.document_id
+            source = _format_chunk_source(chunk)
             lines.append(f"[{idx}] SOURCE={source}")
             lines.append("BEGIN_SNIPPET")
             lines.append(chunk.text.strip())

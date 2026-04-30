@@ -41,6 +41,11 @@ class Settings(BaseModel):
     habit_nudge_time: str = "21:00"
     your_whatsapp_number: str = ""  # e.g. "whatsapp:+14155551234"
 
+    url_ingestion_enabled: bool = True
+    url_scrape_timeout: int = 10
+    url_min_content_words: int = 100
+    url_max_content_words: int = 50000
+
     data_dir: Optional[Path] = None
 
     @model_validator(mode="after")

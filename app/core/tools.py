@@ -304,10 +304,15 @@ class SearchDocumentsTool(Tool):
                 return {"success": False, "error": "Query cannot be empty"}
             result = self.retriever.retrieve(query, top_k=top_k)
             if result.chunks:
-                doc_list = "\n".join(
-                    f"- {c.file_name}: {c.text[:100]}..." for c in result.chunks[:3]
-                )
-                return {"success": True, "result": f"Found in your documents:\n\n{doc_list}"}
+                from urllib.parse import urlparse as _up
+                lines = []
+                for c in result.chunks[:5]:
+                    if c.source_type == "url" and c.source_url:
+                        label = f"{c.file_name} ({_up(c.source_url).netloc}) 🌐"
+                    else:
+                        label = c.file_name or c.source_path or c.document_id
+                    lines.append(f"- [{label}]: {c.text[:150]}...")
+                return {"success": True, "result": "Found in your documents:\n\n" + "\n".join(lines)}
             return {"success": True, "result": f"No documents found matching '{query}'"}
         except Exception as e:
             return {"success": False, "error": f"Failed to search documents: {str(e)}"}

@@ -1,10 +1,12 @@
+import hashlib
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
 from app.ingestion.ingest_service import IngestService
 from app.providers.ollama_embeddings import OllamaEmbeddingsProvider
+from app.schemas.document import ParsedDocument
 from app.storage.chroma_store import ChromaStore
 from app.storage.sqlite_registry import SQLiteRegistry
 
@@ -68,6 +70,63 @@ class IngestCoordinator:
                 summary.files_skipped += 1
                 summary.errors.append(f"{file_path}: {exc}")
         return summary
+
+    def ingest_text(
+        self,
+        content: str,
+        title: str,
+        source_url: str,
+        extra_metadata: Optional[dict] = None,
+    ) -> Tuple[str, int]:
+        """Chunk, embed, and persist scraped text from a URL.
+
+        Returns (document_id, chunks_created). Returns (doc_id, 0) if already ingested.
+        """
+        url_hash = hashlib.sha256(source_url.encode()).hexdigest()[:16]
+        fake_path = Path(f"/url/{url_hash}")
+        checksum = hashlib.sha256(content.encode()).hexdigest()
+        from app.ingestion.ids import build_document_id
+        document_id = build_document_id(fake_path, checksum)
+
+        existing = self._registry.get_document(document_id)
+        if existing:
+            return document_id, 0
+
+        parsed = ParsedDocument(
+            source_path=fake_path,
+            filename=title,
+            extension=".url",
+            checksum_sha256=checksum,
+            parser_name="url_scraper",
+            content=content,
+            char_count=len(content),
+            metadata={
+                "source_type": "url",
+                "source_url": source_url,
+                "title": title,
+                **(extra_metadata or {}),
+            },
+        )
+
+        self._registry.upsert_document(document_id, parsed)
+        self._registry.set_document_source(document_id, source_type="url", source_url=source_url)
+
+        chunks = self._ingest_service._chunker.chunk_document(parsed, document_id=document_id)
+        if not chunks:
+            return document_id, 0
+
+        for chunk in chunks:
+            chunk.metadata.update({
+                "source_type": "url",
+                "source_url": source_url,
+                "title": title,
+            })
+            self._registry.upsert_chunk(chunk)
+
+        embeddings = self._embeddings_provider.embed_texts([c.text for c in chunks])
+        self._vector_store.upsert_chunks(chunks, embeddings)
+
+        return document_id, len(chunks)
 
     def _discover_files(self, input_path: Path) -> List[Path]:
         resolved = input_path.resolve()

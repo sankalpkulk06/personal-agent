@@ -22,7 +22,17 @@ class SQLiteRegistry:
         schema_path = Path(__file__).resolve().parent / "sql_schema.sql"
         schema_sql = schema_path.read_text(encoding="utf-8")
         self._connection.executescript(schema_sql)
+        self._migrate_url_columns()
         self._connection.commit()
+
+    def _migrate_url_columns(self) -> None:
+        existing = {row[1] for row in self._connection.execute("PRAGMA table_info(documents)").fetchall()}
+        if "source_type" not in existing:
+            self._connection.execute("ALTER TABLE documents ADD COLUMN source_type TEXT NOT NULL DEFAULT 'local'")
+        if "source_url" not in existing:
+            self._connection.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
+        if "ingested_at" not in existing:
+            self._connection.execute("ALTER TABLE documents ADD COLUMN ingested_at DATETIME DEFAULT CURRENT_TIMESTAMP")
 
     def close(self) -> None:
         self._connection.close()
@@ -433,6 +443,41 @@ class SQLiteRegistry:
             (phone_number,),
         )
         self._connection.commit()
+
+    def set_document_source(self, document_id: str, source_type: str, source_url: Optional[str] = None) -> None:
+        self._connection.execute(
+            "UPDATE documents SET source_type = ?, source_url = ?, ingested_at = CURRENT_TIMESTAMP WHERE document_id = ?",
+            (source_type, source_url, document_id),
+        )
+        self._connection.commit()
+
+    def is_url_ingested(self, source_url: str) -> bool:
+        row = self._connection.execute(
+            "SELECT 1 FROM documents WHERE source_url = ? AND source_type = 'url' LIMIT 1",
+            (source_url,),
+        ).fetchone()
+        return row is not None
+
+    def list_url_sources(self) -> List[Dict[str, object]]:
+        rows = self._connection.execute(
+            """
+            SELECT document_id, file_name, source_url, ingested_at
+            FROM documents
+            WHERE source_type = 'url'
+            ORDER BY ingested_at DESC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_all_sources(self) -> List[Dict[str, object]]:
+        rows = self._connection.execute(
+            """
+            SELECT document_id, file_name, source_path, source_type, source_url, ingested_at
+            FROM documents
+            ORDER BY ingested_at DESC, created_at DESC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     @staticmethod
     def _row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, object]]:

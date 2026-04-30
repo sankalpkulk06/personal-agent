@@ -16,6 +16,8 @@ class RetrievedChunk(BaseModel):
     file_name: str = ""
     chunk_index: int = 0
     token_count: int = 0
+    source_type: str = "local"
+    source_url: str = ""
     document_metadata: Dict[str, object] = Field(default_factory=dict)
 
 
@@ -68,6 +70,8 @@ class Retriever:
                     file_name=str(metadata.get("file_name", "")),
                     chunk_index=int(metadata.get("chunk_index", 0)),
                     token_count=int(metadata.get("token_count", 0)),
+                    source_type=str(metadata.get("source_type", "local")),
+                    source_url=str(metadata.get("source_url", "") or ""),
                     document_metadata=document_metadata,
                 )
             )

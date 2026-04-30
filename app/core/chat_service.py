@@ -12,6 +12,7 @@ from app.core.tool_executor import ToolExecutor
 from app.core.tools import ToolRegistry
 from app.core.todo_parser import parse_due_date, parse_reminder_request
 from app.services.web_search_service import WebSearchService
+from app.services.url_ingestion_service import URLIngestionService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
 from app.retrieval.retriever import Retriever, RetrievalResult
@@ -63,6 +64,7 @@ class ChatService:
         reminders_service: Optional[RemindersService] = None,
         web_search_service: Optional[WebSearchService] = None,
         habit_service: Optional[HabitService] = None,
+        url_ingestion_service: Optional[URLIngestionService] = None,
         schedule_todo_callback: Optional[Callable[[dict[str, Any]], None]] = None,
         twilio_daily_message_limit: int = 50,
         max_prompt_chunks: int = 5,
@@ -77,6 +79,7 @@ class ChatService:
         self._reminders_service = reminders_service
         self._web_search_service = web_search_service
         self._habit_service = habit_service
+        self._url_ingestion_service = url_ingestion_service
         self._schedule_todo_callback = schedule_todo_callback
         self._twilio_daily_message_limit = twilio_daily_message_limit
         self._max_prompt_chunks = max_prompt_chunks
@@ -175,6 +178,15 @@ class ChatService:
             QAResult with the answer and sources
         """
         history = self.get_history(session_id)
+
+        url_answer = self._answer_url_ingestion(question, response_style=response_style)
+        if url_answer is not None:
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=url_answer,
+                history=history,
+            )
 
         reminder_answer = self._answer_direct_reminder_request(question, response_style=response_style)
         if reminder_answer is not None:
@@ -382,6 +394,21 @@ class ChatService:
     def _is_whatsapp_style(response_style: Optional[str]) -> bool:
         return response_style == "whatsapp"
 
+    def _answer_url_ingestion(
+        self, question: str, response_style: Optional[str] = None
+    ) -> Optional[str]:
+        if not self._url_ingestion_service:
+            return None
+        if not self._url_ingestion_service.is_ingest_intent(question):
+            return None
+        url = self._url_ingestion_service.extract_url(question)
+        if not url:
+            return None
+        result = self._url_ingestion_service.ingest(url)
+        return self._url_ingestion_service.format_confirmation(
+            result, whatsapp=self._is_whatsapp_style(response_style)
+        )
+
     def _answer_direct_command(
         self, question: str, response_style: Optional[str] = None
     ) -> Optional[str]:
@@ -498,7 +525,32 @@ class ChatService:
             )
             return f"🌱 *Habit commands*\n{help_text}" if self._is_whatsapp_style(response_style) else help_text
 
+        if lowered == "/sources" or "what have you saved" in lowered or "what did you save" in lowered:
+            return self._sources_command(response_style=response_style)
+
         return None
+
+    def _sources_command(self, response_style: Optional[str] = None) -> str:
+        sources = self._registry.list_all_sources()
+        if not sources:
+            return self._style_status("Nothing saved yet. Paste a URL or ingest a file to get started.", "📚", response_style)
+        url_sources = [s for s in sources if s.get("source_type") == "url"]
+        local_sources = [s for s in sources if s.get("source_type") != "url"]
+        lines = []
+        if self._is_whatsapp_style(response_style):
+            lines.append(f"📚 *Your saved sources ({len(sources)})*")
+        else:
+            lines.append(f"📚 Your saved sources ({len(sources)}):")
+        idx = 1
+        for s in url_sources:
+            from urllib.parse import urlparse as _up
+            domain = _up(s.get("source_url") or "").netloc or s.get("source_url", "")
+            lines.append(f"[{idx}] {s.get('file_name', 'untitled')} — {domain} 🌐")
+            idx += 1
+        for s in local_sources:
+            lines.append(f"[{idx}] {s.get('file_name', s.get('source_path', 'untitled'))} 📄")
+            idx += 1
+        return "\n".join(lines)
 
     def _answer_direct_reminder_request(
         self, question: str, response_style: Optional[str] = None
