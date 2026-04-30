@@ -225,6 +225,22 @@ class SQLiteRegistry:
         self._connection.commit()
         return session_id
 
+    def get_or_create_named_session(self, name: str) -> str:
+        row = self._connection.execute(
+            "SELECT session_id FROM named_sessions WHERE name = ?",
+            (name,),
+        ).fetchone()
+        if row:
+            return row["session_id"]
+        session_id = str(uuid.uuid4())
+        self._connection.execute(
+            "INSERT INTO named_sessions (name, session_id) VALUES (?, ?)",
+            (name, session_id),
+        )
+        self.create_session(session_id=session_id, title=name)
+        self._connection.commit()
+        return session_id
+
     def update_whatsapp_last_active(self, phone_number: str) -> None:
         self._connection.execute(
             "UPDATE whatsapp_sessions SET last_active = CURRENT_TIMESTAMP WHERE phone_number = ?",

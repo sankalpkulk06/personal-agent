@@ -40,6 +40,7 @@ def build_chat_messages(
     assistant_name: str = "Sanky",
     learned_facts: List[dict[str, Any]] = None,
     news_articles: List[dict[str, Any]] = None,
+    response_style: Optional[str] = None,
 ) -> List[dict[str, Any]]:
     """Build a messages list for /api/chat endpoint with conversation history.
 
@@ -82,6 +83,9 @@ def build_chat_messages(
         "- Be warm and wise. You're a trusted companion, not a search engine."
     )
 
+    if response_style:
+        system_message += f"\n\nResponse style:\n{response_style}"
+
     if learned_facts:
         facts_block = "\n".join([f"- {fact['content']}" for fact in learned_facts])
         system_message += f"\n\nAbout the user (what I know):\n{facts_block}"
@@ -108,12 +112,15 @@ def build_chat_messages(
 def build_system_message_with_tools(
     assistant_name: str = "Sage",
     tools_schemas: Optional[List[dict[str, Any]]] = None,
+    learned_facts: Optional[List[dict[str, Any]]] = None,
+    response_style: Optional[str] = None,
 ) -> str:
     """Build a system message that instructs the model on tool use.
 
     Args:
         assistant_name: Name of the assistant
         tools_schemas: List of tool schemas from ToolRegistry.to_schemas()
+        learned_facts: Optional list of learned facts to inject about the user
 
     Returns:
         System message string with tool definitions
@@ -127,6 +134,13 @@ def build_system_message_with_tools(
         "- Always use the exact tool name and parameters from the definitions below\n"
         "- For natural language dates/times, describe them as the user said (e.g., 'tomorrow', 'next Tuesday')\n\n"
     )
+
+    if learned_facts:
+        facts_block = "\n".join([f"- {fact['content']}" for fact in learned_facts])
+        message += f"About the user (what you know about them):\n{facts_block}\n\n"
+
+    if response_style:
+        message += f"Response style:\n{response_style}\n\n"
 
     if tools_schemas:
         message += "Available tools:\n"

@@ -60,7 +60,11 @@ async def webhook(
     phone = From
     session_id = _registry.get_or_create_whatsapp_session(phone)
 
-    result = _chat_service.answer_in_session(session_id=session_id, question=Body)
+    result = _chat_service.answer_in_session(
+        session_id=session_id,
+        question=Body,
+        response_style="whatsapp",
+    )
     reply = result.answer
 
     if _whatsapp_service:

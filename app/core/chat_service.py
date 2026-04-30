@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import date
 from typing import List, Optional
 
 from app.core.qa_service import QAResult
@@ -18,6 +19,14 @@ from app.storage.sqlite_registry import SQLiteRegistry
 
 class ChatService:
     """Session-aware chat service with conversation history and persistence."""
+
+    WHATSAPP_RESPONSE_STYLE = (
+        "Format replies for WhatsApp: easy to scan on a phone, warm, casual, and concise. "
+        "Use friendly emojis as visual anchors, especially at the start of short sections or status lines. "
+        "Prefer short paragraphs or compact bullets. Avoid dense blocks of text. "
+        "Use WhatsApp markdown lightly (*bold* for labels, backticks for commands). "
+        "Do not overdo it: 1-4 useful emojis is usually enough unless the user is celebrating."
+    )
 
     CONVERSATIONAL_PATTERNS = [
         r"^(hi|hello|hey|howdy|sup|yo)\b",
@@ -138,7 +147,11 @@ class ChatService:
         return None
 
     def answer_in_session(
-        self, session_id: str, question: str, top_k: Optional[int] = None
+        self,
+        session_id: str,
+        question: str,
+        top_k: Optional[int] = None,
+        response_style: Optional[str] = None,
     ) -> QAResult:
         """Answer a question within a chat session with full conversation history.
 
@@ -156,12 +169,40 @@ class ChatService:
         """
         history = self.get_history(session_id)
 
+        direct_answer = self._answer_direct_command(question, response_style=response_style)
+        if direct_answer is not None:
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=direct_answer,
+                history=history,
+            )
+
+        news_result = self._answer_news_query(question, response_style=response_style)
+        if news_result is not None:
+            answer, news_articles = news_result
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=answer,
+                history=history,
+                sources_used=bool(news_articles),
+                news_articles=news_articles,
+            )
+
         # Build messages with tool-aware system prompt
         if self._enable_tools:
             tool_schemas = self._tool_registry.to_schemas()
+            learned_facts_list = []
+            if self._fact_service:
+                personal = self._fact_service.get_relevant_facts("personal", limit=5)
+                work = self._fact_service.get_relevant_facts("work", limit=5)
+                learned_facts_list = [{"content": f.content} for f in (personal + work)]
             system_message = build_system_message_with_tools(
                 assistant_name=self._assistant_name,
                 tools_schemas=tool_schemas,
+                learned_facts=learned_facts_list if learned_facts_list else None,
+                response_style=self._resolve_response_style(response_style),
             )
         else:
             system_message = (
@@ -251,11 +292,36 @@ class ChatService:
                 max_chunks=self._max_prompt_chunks,
                 assistant_name=self._assistant_name,
                 learned_facts=learned_facts_list if learned_facts_list else None,
+                response_style=self._resolve_response_style(response_style),
             )
 
             answer = self._chat_provider.chat(messages=messages)
 
-        # Save to session history
+        return self._record_answer(
+            session_id=session_id,
+            question=question,
+            answer=answer,
+            history=history,
+            sources=sources,
+            retrieval=retrieval,
+            sources_used=bool(news_articles or web_sources or chunks),
+            news_articles=news_articles,
+            web_sources=web_sources,
+        )
+
+    def _record_answer(
+        self,
+        session_id: str,
+        question: str,
+        answer: str,
+        history: List[dict],
+        sources: Optional[list] = None,
+        retrieval: Optional[RetrievalResult] = None,
+        sources_used: bool = False,
+        news_articles: Optional[List[NewsArticle]] = None,
+        web_sources: Optional[List[dict]] = None,
+    ) -> QAResult:
+        """Persist a user/assistant exchange and return the standard result shape."""
         user_turn_id = str(uuid.uuid4())
         assistant_turn_id = str(uuid.uuid4())
 
@@ -276,18 +342,262 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
-        # Sources are used if we have news articles, web results, or document chunks
-        sources_used = bool(news_articles or web_sources or chunks)
+        retrieval = retrieval or RetrievalResult(question=question, chunks=[], top_k=0)
+        news_articles = news_articles or []
+        web_sources = web_sources or []
         return QAResult(
             question=question,
             answer=answer,
-            sources=sources,
+            sources=sources or [],
             retrieval=retrieval,
             prompt="",
             sources_used=sources_used,
             news_sources=[{"title": a.title, "source": a.source, "url": a.url} for a in news_articles],
             web_sources=web_sources,
         )
+
+    @classmethod
+    def _resolve_response_style(cls, response_style: Optional[str]) -> Optional[str]:
+        if response_style == "whatsapp":
+            return cls.WHATSAPP_RESPONSE_STYLE
+        return response_style
+
+    @staticmethod
+    def _is_whatsapp_style(response_style: Optional[str]) -> bool:
+        return response_style == "whatsapp"
+
+    def _answer_direct_command(
+        self, question: str, response_style: Optional[str] = None
+    ) -> Optional[str]:
+        """Handle slash commands without relying on model tool selection."""
+        command = question.strip()
+        lowered = command.lower()
+        if not lowered.startswith("/"):
+            return None
+
+        if lowered.startswith("/remember-personal "):
+            return self._remember_fact_command(
+                command, "/remember-personal ", "personal", response_style=response_style
+            )
+        if lowered.startswith("/remember-work "):
+            return self._remember_fact_command(
+                command, "/remember-work ", "work", response_style=response_style
+            )
+        if lowered in ("/remember-personal", "/remember-work"):
+            usage = f"Usage: {lowered} <fact>"
+            return f"📝 {usage}" if self._is_whatsapp_style(response_style) else usage
+
+        if lowered.startswith("/facts"):
+            return self._facts_command(lowered, response_style=response_style)
+
+        if lowered.startswith("/forget "):
+            if not self._fact_service:
+                return self._style_status("Fact memory is not configured.", "⚠️", response_style)
+            fact_id = command[len("/forget "):].strip()
+            if not fact_id:
+                return self._style_status("Usage: /forget <fact-id>", "📝", response_style)
+            self._fact_service.forget(fact_id)
+            return self._style_status("Fact forgotten.", "🗑️", response_style)
+
+        if lowered == "/habits":
+            if not self._habit_service:
+                return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
+            return self._format_habit_summary(response_style=response_style)
+
+        if lowered.startswith("/habit add "):
+            if not self._habit_service:
+                return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
+            args = command[len("/habit add "):].strip()
+            name, reminder_time = self._parse_habit_reminder_time(args)
+            if not name:
+                return self._style_status("Usage: /habit add <name> [@time]", "📝", response_style)
+            habit = self._habit_service.add_habit(name=name, reminder_time=reminder_time)
+            return self._style_status(
+                f"Habit '{habit.name}' added (reminder at {habit.reminder_time}).",
+                "✅",
+                response_style,
+            )
+
+        if lowered.startswith("/habit log "):
+            if not self._habit_service:
+                return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
+            args = command[len("/habit log "):].strip()
+            if not args:
+                return self._style_status("Usage: /habit log <name> [skipped]", "📝", response_style)
+            status = "done"
+            name = args
+            if args.lower().endswith(" skipped"):
+                status = "skipped"
+                name = args[:-len(" skipped")].strip()
+            try:
+                log = self._habit_service.log_habit(name=name, status=status)
+            except ValueError as exc:
+                return str(exc)
+            verb = "skipped" if log.status == "skipped" else "logged for today"
+            return self._style_status(f"Habit '{name}' {verb}.", "✅", response_style)
+
+        if lowered.startswith("/habit unlog "):
+            if not self._habit_service:
+                return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
+            name = command[len("/habit unlog "):].strip()
+            if not name:
+                return self._style_status("Usage: /habit unlog <name>", "📝", response_style)
+            try:
+                deleted = self._habit_service.unlog_habit(name)
+            except ValueError as exc:
+                return str(exc)
+            if deleted:
+                return self._style_status(f"Removed today's log for '{name}'.", "↩️", response_style)
+            return self._style_status(f"No log found for '{name}' today.", "ℹ️", response_style)
+
+        if lowered.startswith("/habit delete "):
+            if not self._habit_service:
+                return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
+            name = command[len("/habit delete "):].strip()
+            if not name:
+                return self._style_status("Usage: /habit delete <name>", "📝", response_style)
+            if self._habit_service.delete_habit(name):
+                return self._style_status(f"Habit '{name}' removed.", "🗑️", response_style)
+            return self._style_status(f"Habit '{name}' not found.", "ℹ️", response_style)
+
+        if lowered.startswith("/habit"):
+            help_text = (
+                "Habit commands:\n"
+                "/habit add <name> [@time]\n"
+                "/habit log <name> [skipped]\n"
+                "/habit unlog <name>\n"
+                "/habit delete <name>\n"
+                "/habits"
+            )
+            return f"🌱 *Habit commands*\n{help_text}" if self._is_whatsapp_style(response_style) else help_text
+
+        return None
+
+    def _style_status(self, text: str, emoji: str, response_style: Optional[str]) -> str:
+        if self._is_whatsapp_style(response_style):
+            return f"{emoji} {text}"
+        return text
+
+    def _answer_news_query(
+        self, question: str, response_style: Optional[str] = None
+    ) -> Optional[tuple[str, List[NewsArticle]]]:
+        if not self._news_service:
+            return None
+
+        stripped = question.strip()
+        lowered = stripped.lower()
+        explicit_news = lowered == "/news" or lowered.startswith("/news ")
+        if not explicit_news and not self._is_news_query(stripped):
+            return None
+
+        query = stripped[len("/news"):].strip() if explicit_news else (self._extract_news_topic(stripped) or stripped)
+        articles = self._news_service.search_news(query) if query else self._news_service.get_top_news()
+        if not articles:
+            topic = query or "top news"
+            return self._style_status(f"No news found for '{topic}'.", "📰", response_style), []
+
+        summary = self._news_service.generate_summary(articles, self._chat_provider)
+        return self._format_news_answer(query=query, summary=summary, articles=articles, response_style=response_style), articles
+
+    def _format_news_answer(
+        self,
+        query: str,
+        summary: str,
+        articles: List[NewsArticle],
+        response_style: Optional[str] = None,
+    ) -> str:
+        title = f"Latest News: {query}" if query else "Top News Today"
+        if self._is_whatsapp_style(response_style):
+            lines = [f"📰 *{title}*", "", f"⚡ *Summary*\n{summary.strip()}", "", "🔗 *Sources*"]
+            for i, article in enumerate(articles, 1):
+                lines.append(f"{i}. *{article.title}*")
+                lines.append(f"   {article.source}")
+                lines.append(f"   {article.url}")
+            return "\n".join(lines)
+
+        lines = [title, "", "Summary:", summary.strip(), "", "Sources:"]
+        for i, article in enumerate(articles, 1):
+            lines.append(f"{i}. {article.title}")
+            lines.append(f"   {article.source} | {article.published}")
+            lines.append(f"   {article.url}")
+        return "\n".join(lines)
+
+    def _remember_fact_command(
+        self, command: str, prefix: str, category: str, response_style: Optional[str] = None
+    ) -> str:
+        if not self._fact_service:
+            return self._style_status("Fact memory is not configured.", "⚠️", response_style)
+        fact_text = command[len(prefix):].strip()
+        if not fact_text:
+            return self._style_status(f"Usage: {prefix.strip()} <fact>", "📝", response_style)
+        self._fact_service.remember(content=fact_text, category=category)
+        return self._style_status(f"{category.title()} fact saved: {fact_text}", "🧠", response_style)
+
+    def _facts_command(self, lowered: str, response_style: Optional[str] = None) -> str:
+        if not self._fact_service:
+            return self._style_status("Fact memory is not configured.", "⚠️", response_style)
+        parts = lowered.split()
+        category = parts[1] if len(parts) > 1 else None
+        if category == "all":
+            category = None
+        facts = self._fact_service.list_facts(category=category)
+        if not facts:
+            return self._style_status(
+                "No facts learned yet. Use /remember-personal or /remember-work.",
+                "ℹ️",
+                response_style,
+            )
+        label = category.title() if category else "All"
+        if self._is_whatsapp_style(response_style):
+            lines = [f"🧠 *Learned Facts - {label}*"]
+        else:
+            lines = [f"Learned Facts - {label}:"]
+        for i, fact in enumerate(facts[:20], 1):
+            lines.append(f"{i}. {fact.content} ({fact.category})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_habit_reminder_time(args: str) -> tuple[str, str]:
+        match = re.search(r"@(\S+)", args)
+        if match:
+            time_str = match.group(1)
+            name = args[: match.start()].strip()
+            return name, time_str
+        return args.strip(), "21:00"
+
+    def _format_habit_summary(self, response_style: Optional[str] = None) -> str:
+        summaries = self._habit_service.get_weekly_summary() if self._habit_service else []
+        week_label = date.today().strftime("Week of %b %-d, %Y")
+        if self._is_whatsapp_style(response_style):
+            lines = [f"📊 *Habit Summary* — {week_label}"]
+        else:
+            lines = [f"Habit Summary - {week_label}"]
+
+        if not summaries:
+            lines.append("")
+            prefix = "🌱 " if self._is_whatsapp_style(response_style) else ""
+            lines.append(f"{prefix}No habits tracked yet. Add one with /habit add <name>.")
+            return "\n".join(lines)
+
+        total_done = 0
+        total_possible = len(summaries) * 7
+        lines.append("")
+        for summary in summaries:
+            filled = round(summary.days_done / 7 * 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            total_done += summary.days_done
+            if summary.streak > 0:
+                streak_label = f"🔥 {summary.streak}-day streak" if self._is_whatsapp_style(response_style) else f"{summary.streak}-day streak"
+            else:
+                streak_label = "💤 streak broken" if self._is_whatsapp_style(response_style) else "streak broken"
+            lines.append(
+                f"{summary.habit.name:<14} {bar}   "
+                f"{summary.days_done}/7 days   {streak_label}"
+            )
+        lines.append("")
+        total_prefix = "✅ " if self._is_whatsapp_style(response_style) else ""
+        lines.append(f"{total_prefix}Total logged this week: {total_done}/{total_possible}")
+        return "\n".join(lines)
 
     def create_session(self, session_id: str, title: str = "") -> None:
         """Create a new chat session.
