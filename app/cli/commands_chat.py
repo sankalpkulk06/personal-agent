@@ -644,11 +644,17 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
             if result.sources_used and result.sources:
                 shown = set()
                 for source in result.sources:
-                    source_label = source.file_name or source.source_path or source.document_id
+                    if source.source_type == "url" and source.source_url:
+                        from urllib.parse import urlparse
+
+                        domain = urlparse(source.source_url).netloc
+                        source_label = f"{source.file_name or 'untitled'} — {domain} 🌐"
+                    else:
+                        source_label = f"{source.file_name or source.source_path or source.document_id} 📄"
                     if source_label in shown:
                         continue
                     shown.add(source_label)
-                    console.print(f"[cyan]📄[/cyan] {source_label}")
+                    console.print(f"[cyan]{source_label}[/cyan]")
             console.print()
 
         console.print("[bold cyan]╰──────────╯[/bold cyan]")

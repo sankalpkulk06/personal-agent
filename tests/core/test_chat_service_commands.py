@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pytest
 
 from app.core.chat_service import ChatService
 from app.core.fact_service import FactService
 from app.core.habit_service import HabitService
+from app.schemas.document import ParsedDocument
 from app.services.news_service import NewsArticle
 from app.storage.sqlite_registry import SQLiteRegistry
 
@@ -200,6 +203,29 @@ def test_usage_command_reports_chat_and_twilio_usage(registry):
     assert "WhatsApp chats: 2" in result.answer
     assert "2/50 messages used" in result.answer
     assert "48 remaining" in result.answer
+
+
+def test_sources_intent_works_without_slash(registry):
+    service = _service(registry)
+    service.create_session("session")
+    document = ParsedDocument(
+        source_path=Path("/url/article"),
+        filename="Saved Article",
+        extension=".url",
+        checksum_sha256="d" * 64,
+        parser_name="url_scraper",
+        content="saved content",
+        char_count=13,
+        metadata={"source_type": "url", "source_url": "https://example.com/a"},
+    )
+    registry.upsert_document("doc-url", document)
+    registry.set_document_source("doc-url", source_type="url", source_url="https://example.com/a")
+
+    result = service.answer_in_session(session_id="session", question="what have you saved?")
+
+    assert "Your saved sources" in result.answer
+    assert "Saved Article" in result.answer
+    assert "example.com" in result.answer
 
 
 def test_natural_language_reminder_uses_add_todo_tool(registry):

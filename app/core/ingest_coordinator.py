@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -104,6 +105,7 @@ class IngestCoordinator:
                 "source_type": "url",
                 "source_url": source_url,
                 "title": title,
+                "ingested_at": datetime.utcnow().isoformat(),
                 **(extra_metadata or {}),
             },
         )
@@ -120,6 +122,7 @@ class IngestCoordinator:
                 "source_type": "url",
                 "source_url": source_url,
                 "title": title,
+                "ingested_at": parsed.metadata.get("ingested_at", ""),
             })
             self._registry.upsert_chunk(chunk)
 
@@ -140,4 +143,3 @@ class IngestCoordinator:
         for extension in self._supported_extensions:
             discovered.extend(path for path in resolved.rglob(f"*{extension}") if path.is_file())
         return sorted(set(path.resolve() for path in discovered))
-

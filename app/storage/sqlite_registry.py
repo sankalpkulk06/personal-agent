@@ -33,6 +33,8 @@ class SQLiteRegistry:
             self._connection.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
         if "ingested_at" not in existing:
             self._connection.execute("ALTER TABLE documents ADD COLUMN ingested_at DATETIME")
+        self._connection.execute("UPDATE documents SET source_type = 'local' WHERE source_type IS NULL")
+        self._connection.execute("UPDATE documents SET ingested_at = CURRENT_TIMESTAMP WHERE ingested_at IS NULL")
 
     def close(self) -> None:
         self._connection.close()

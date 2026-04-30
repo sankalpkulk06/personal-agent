@@ -59,6 +59,9 @@ class Retriever:
                 if stored_doc is not None:
                     doc_meta = stored_doc.get("metadata_json")
                     document_metadata = doc_meta if isinstance(doc_meta, dict) else {}
+                    document_metadata.setdefault("source_type", stored_doc.get("source_type", "local"))
+                    document_metadata.setdefault("source_url", stored_doc.get("source_url", ""))
+                    document_metadata.setdefault("ingested_at", stored_doc.get("ingested_at", ""))
 
             chunks.append(
                 RetrievedChunk(
@@ -70,11 +73,10 @@ class Retriever:
                     file_name=str(metadata.get("file_name", "")),
                     chunk_index=int(metadata.get("chunk_index", 0)),
                     token_count=int(metadata.get("token_count", 0)),
-                    source_type=str(metadata.get("source_type", "local")),
-                    source_url=str(metadata.get("source_url", "") or ""),
+                    source_type=str(metadata.get("source_type", document_metadata.get("source_type", "local"))),
+                    source_url=str(metadata.get("source_url", document_metadata.get("source_url", "")) or ""),
                     document_metadata=document_metadata,
                 )
             )
 
         return RetrievalResult(question=question, chunks=chunks, top_k=effective_top_k)
-

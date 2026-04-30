@@ -415,6 +415,10 @@ class ChatService:
         """Handle slash commands without relying on model tool selection."""
         command = question.strip()
         lowered = command.lower()
+
+        if lowered in ("/sources",) or "what have you saved" in lowered or "what did you save" in lowered:
+            return self._sources_command(response_style=response_style)
+
         if not lowered.startswith("/"):
             return None
 
@@ -524,9 +528,6 @@ class ChatService:
                 "/habits"
             )
             return f"🌱 *Habit commands*\n{help_text}" if self._is_whatsapp_style(response_style) else help_text
-
-        if lowered == "/sources" or "what have you saved" in lowered or "what did you save" in lowered:
-            return self._sources_command(response_style=response_style)
 
         return None
 

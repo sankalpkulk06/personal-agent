@@ -168,7 +168,13 @@ def ask_command(
         console.print("\n[bold magenta]Sources:[/bold magenta]")
         seen = set()
         for source in result.sources:
-            source_label = source.file_name or source.source_path or source.document_id
+            if source.source_type == "url" and source.source_url:
+                from urllib.parse import urlparse
+
+                domain = urlparse(source.source_url).netloc
+                source_label = f"{source.file_name or 'untitled'} — {domain} 🌐"
+            else:
+                source_label = f"{source.file_name or source.source_path or source.document_id} 📄"
             if source_label in seen:
                 continue
             seen.add(source_label)
