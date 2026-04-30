@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import date
 from typing import List, Optional
 
 from app.core.qa_service import QAResult
@@ -156,6 +157,15 @@ class ChatService:
         """
         history = self.get_history(session_id)
 
+        direct_answer = self._answer_direct_command(question)
+        if direct_answer is not None:
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=direct_answer,
+                history=history,
+            )
+
         # Build messages with tool-aware system prompt
         if self._enable_tools:
             tool_schemas = self._tool_registry.to_schemas()
@@ -261,7 +271,31 @@ class ChatService:
 
             answer = self._chat_provider.chat(messages=messages)
 
-        # Save to session history
+        return self._record_answer(
+            session_id=session_id,
+            question=question,
+            answer=answer,
+            history=history,
+            sources=sources,
+            retrieval=retrieval,
+            sources_used=bool(news_articles or web_sources or chunks),
+            news_articles=news_articles,
+            web_sources=web_sources,
+        )
+
+    def _record_answer(
+        self,
+        session_id: str,
+        question: str,
+        answer: str,
+        history: List[dict],
+        sources: Optional[list] = None,
+        retrieval: Optional[RetrievalResult] = None,
+        sources_used: bool = False,
+        news_articles: Optional[List[NewsArticle]] = None,
+        web_sources: Optional[List[dict]] = None,
+    ) -> QAResult:
+        """Persist a user/assistant exchange and return the standard result shape."""
         user_turn_id = str(uuid.uuid4())
         assistant_turn_id = str(uuid.uuid4())
 
@@ -282,18 +316,177 @@ class ChatService:
             turn_index=turn_index + 1,
         )
 
-        # Sources are used if we have news articles, web results, or document chunks
-        sources_used = bool(news_articles or web_sources or chunks)
+        retrieval = retrieval or RetrievalResult(question=question, chunks=[], top_k=0)
+        news_articles = news_articles or []
+        web_sources = web_sources or []
         return QAResult(
             question=question,
             answer=answer,
-            sources=sources,
+            sources=sources or [],
             retrieval=retrieval,
             prompt="",
             sources_used=sources_used,
             news_sources=[{"title": a.title, "source": a.source, "url": a.url} for a in news_articles],
             web_sources=web_sources,
         )
+
+    def _answer_direct_command(self, question: str) -> Optional[str]:
+        """Handle slash commands without relying on model tool selection."""
+        command = question.strip()
+        lowered = command.lower()
+        if not lowered.startswith("/"):
+            return None
+
+        if lowered.startswith("/remember-personal "):
+            return self._remember_fact_command(command, "/remember-personal ", "personal")
+        if lowered.startswith("/remember-work "):
+            return self._remember_fact_command(command, "/remember-work ", "work")
+        if lowered in ("/remember-personal", "/remember-work"):
+            return f"Usage: {lowered} <fact>"
+
+        if lowered.startswith("/facts"):
+            return self._facts_command(lowered)
+
+        if lowered.startswith("/forget "):
+            if not self._fact_service:
+                return "Fact memory is not configured."
+            fact_id = command[len("/forget "):].strip()
+            if not fact_id:
+                return "Usage: /forget <fact-id>"
+            self._fact_service.forget(fact_id)
+            return "Fact forgotten."
+
+        if lowered == "/habits":
+            if not self._habit_service:
+                return "Habit tracking is not configured."
+            return self._format_habit_summary()
+
+        if lowered.startswith("/habit add "):
+            if not self._habit_service:
+                return "Habit tracking is not configured."
+            args = command[len("/habit add "):].strip()
+            name, reminder_time = self._parse_habit_reminder_time(args)
+            if not name:
+                return "Usage: /habit add <name> [@time]"
+            habit = self._habit_service.add_habit(name=name, reminder_time=reminder_time)
+            return f"Habit '{habit.name}' added (reminder at {habit.reminder_time})."
+
+        if lowered.startswith("/habit log "):
+            if not self._habit_service:
+                return "Habit tracking is not configured."
+            args = command[len("/habit log "):].strip()
+            if not args:
+                return "Usage: /habit log <name> [skipped]"
+            status = "done"
+            name = args
+            if args.lower().endswith(" skipped"):
+                status = "skipped"
+                name = args[:-len(" skipped")].strip()
+            try:
+                log = self._habit_service.log_habit(name=name, status=status)
+            except ValueError as exc:
+                return str(exc)
+            verb = "skipped" if log.status == "skipped" else "logged for today"
+            return f"Habit '{name}' {verb}."
+
+        if lowered.startswith("/habit unlog "):
+            if not self._habit_service:
+                return "Habit tracking is not configured."
+            name = command[len("/habit unlog "):].strip()
+            if not name:
+                return "Usage: /habit unlog <name>"
+            try:
+                deleted = self._habit_service.unlog_habit(name)
+            except ValueError as exc:
+                return str(exc)
+            if deleted:
+                return f"Removed today's log for '{name}'."
+            return f"No log found for '{name}' today."
+
+        if lowered.startswith("/habit delete "):
+            if not self._habit_service:
+                return "Habit tracking is not configured."
+            name = command[len("/habit delete "):].strip()
+            if not name:
+                return "Usage: /habit delete <name>"
+            if self._habit_service.delete_habit(name):
+                return f"Habit '{name}' removed."
+            return f"Habit '{name}' not found."
+
+        if lowered.startswith("/habit"):
+            return (
+                "Habit commands:\n"
+                "/habit add <name> [@time]\n"
+                "/habit log <name> [skipped]\n"
+                "/habit unlog <name>\n"
+                "/habit delete <name>\n"
+                "/habits"
+            )
+
+        return None
+
+    def _remember_fact_command(self, command: str, prefix: str, category: str) -> str:
+        if not self._fact_service:
+            return "Fact memory is not configured."
+        fact_text = command[len(prefix):].strip()
+        if not fact_text:
+            return f"Usage: {prefix.strip()} <fact>"
+        self._fact_service.remember(content=fact_text, category=category)
+        return f"{category.title()} fact saved: {fact_text}"
+
+    def _facts_command(self, lowered: str) -> str:
+        if not self._fact_service:
+            return "Fact memory is not configured."
+        parts = lowered.split()
+        category = parts[1] if len(parts) > 1 else None
+        if category == "all":
+            category = None
+        facts = self._fact_service.list_facts(category=category)
+        if not facts:
+            return "No facts learned yet. Use /remember-personal or /remember-work."
+        label = category.title() if category else "All"
+        lines = [f"Learned Facts - {label}:"]
+        for i, fact in enumerate(facts[:20], 1):
+            lines.append(f"{i}. {fact.content} ({fact.category})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_habit_reminder_time(args: str) -> tuple[str, str]:
+        match = re.search(r"@(\S+)", args)
+        if match:
+            time_str = match.group(1)
+            name = args[: match.start()].strip()
+            return name, time_str
+        return args.strip(), "21:00"
+
+    def _format_habit_summary(self) -> str:
+        summaries = self._habit_service.get_weekly_summary() if self._habit_service else []
+        week_label = date.today().strftime("Week of %b %-d, %Y")
+        lines = [f"Habit Summary - {week_label}"]
+
+        if not summaries:
+            lines.append("")
+            lines.append("No habits tracked yet. Add one with /habit add <name>.")
+            return "\n".join(lines)
+
+        total_done = 0
+        total_possible = len(summaries) * 7
+        lines.append("")
+        for summary in summaries:
+            filled = round(summary.days_done / 7 * 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            total_done += summary.days_done
+            if summary.streak > 0:
+                streak_label = f"{summary.streak}-day streak"
+            else:
+                streak_label = "streak broken"
+            lines.append(
+                f"{summary.habit.name:<14} {bar}   "
+                f"{summary.days_done}/7 days   {streak_label}"
+            )
+        lines.append("")
+        lines.append(f"Total logged this week: {total_done}/{total_possible}")
+        return "\n".join(lines)
 
     def create_session(self, session_id: str, title: str = "") -> None:
         """Create a new chat session.
