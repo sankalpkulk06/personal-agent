@@ -47,6 +47,9 @@ async def lifespan(app: FastAPI):
             account_sid=settings.twilio_account_sid,
             auth_token=settings.twilio_auth_token,
             from_number=settings.twilio_whatsapp_number,
+            usage_registry=_registry,
+            usage_alert_to=settings.your_whatsapp_number,
+            daily_message_limit=settings.twilio_daily_message_limit,
         )
     else:
         logger.warning(
@@ -125,7 +128,7 @@ async def webhook(
             _registry.clear_nudge_context(phone)
             reply = f"Logged *{habit.name}* as {status} for today!"
             if _whatsapp_service:
-                _whatsapp_service.send_message(to=phone, body=reply)
+                _safe_send(phone, reply)
             _registry.update_whatsapp_last_active(phone)
             return Response(content="", media_type="application/xml")
 
@@ -139,7 +142,7 @@ async def webhook(
     reply = result.answer
 
     if _whatsapp_service:
-        _whatsapp_service.send_message(to=phone, body=reply)
+        _safe_send(phone, reply)
     else:
         logger.warning("WhatsApp service unavailable; reply not sent to %s", phone)
 
@@ -151,3 +154,14 @@ async def webhook(
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+def _safe_send(to: str, body: str) -> bool:
+    if not _whatsapp_service:
+        return False
+    try:
+        _whatsapp_service.send_message(to=to, body=body)
+        return True
+    except Exception:
+        logger.exception("Failed to send WhatsApp reply to %s", to)
+        return False

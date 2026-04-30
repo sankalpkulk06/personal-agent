@@ -33,6 +33,7 @@ class Settings(BaseModel):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = ""  # e.g. "whatsapp:+14155238886"
+    twilio_daily_message_limit: int = Field(default=50, gt=0)
     webhook_port: int = 8000
     whatsapp_enabled: bool = True
     scheduler_enabled: bool = True

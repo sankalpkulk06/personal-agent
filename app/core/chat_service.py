@@ -64,6 +64,7 @@ class ChatService:
         web_search_service: Optional[WebSearchService] = None,
         habit_service: Optional[HabitService] = None,
         schedule_todo_callback: Optional[Callable[[dict[str, Any]], None]] = None,
+        twilio_daily_message_limit: int = 50,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sage",
         enable_tools: bool = True,
@@ -77,6 +78,7 @@ class ChatService:
         self._web_search_service = web_search_service
         self._habit_service = habit_service
         self._schedule_todo_callback = schedule_todo_callback
+        self._twilio_daily_message_limit = twilio_daily_message_limit
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
         self._enable_tools = enable_tools
@@ -404,6 +406,9 @@ class ChatService:
         if lowered.startswith("/facts"):
             return self._facts_command(lowered, response_style=response_style)
 
+        if lowered == "/usage":
+            return self._usage_command(response_style=response_style)
+
         if lowered.startswith("/forget "):
             if not self._fact_service:
                 return self._style_status("Fact memory is not configured.", "⚠️", response_style)
@@ -540,6 +545,27 @@ class ChatService:
         if self._is_whatsapp_style(response_style):
             return f"{emoji} {text}"
         return text
+
+    def _usage_command(self, response_style: Optional[str] = None) -> str:
+        chat_usage = self._registry.get_chat_usage_today()
+        twilio_usage = self._registry.get_whatsapp_usage_today(
+            daily_limit=self._twilio_daily_message_limit
+        )
+        text = "\n".join(
+            [
+                "Usage today",
+                f"CLI chats: {chat_usage['cli']}",
+                f"WhatsApp chats: {chat_usage['whatsapp']}",
+                (
+                    "Twilio WhatsApp outbound before this reply: "
+                    f"{twilio_usage['sent_count']}/{twilio_usage['daily_limit']} "
+                    f"messages used, {twilio_usage['remaining']} remaining."
+                ),
+            ]
+        )
+        if chat_usage["other"]:
+            text += f"\nOther chats: {chat_usage['other']}"
+        return self._style_status(text, "📊", response_style)
 
     def _answer_news_query(
         self, question: str, response_style: Optional[str] = None

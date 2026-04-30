@@ -179,6 +179,29 @@ def test_todo_command_writes_sqlite_not_apple(registry):
     assert todos[0]["title"] == "Take trash out"
 
 
+def test_usage_command_reports_chat_and_twilio_usage(registry):
+    service = _service(registry)
+    cli_session = registry.get_or_create_named_session("cli:default")
+    whatsapp_session = registry.get_or_create_whatsapp_session("whatsapp:+1")
+    service.create_session("session")
+    registry.append_turn(cli_session, "cli-user", "user", "hello", 0)
+    registry.append_turn(whatsapp_session, "wa-user", "user", "hello", 0)
+    registry.append_turn(whatsapp_session, "wa-user-2", "user", "again", 1)
+    registry.record_whatsapp_message_sent()
+    registry.record_whatsapp_message_sent()
+
+    result = service.answer_in_session(
+        session_id="session",
+        question="/usage",
+        response_style="whatsapp",
+    )
+
+    assert "CLI chats: 1" in result.answer
+    assert "WhatsApp chats: 2" in result.answer
+    assert "2/50 messages used" in result.answer
+    assert "48 remaining" in result.answer
+
+
 def test_natural_language_reminder_uses_add_todo_tool(registry):
     scheduled = []
     service = ChatService(

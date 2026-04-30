@@ -109,6 +109,7 @@ def create_chat_service(
         web_search_service=web_search_service,
         habit_service=habit_service,
         schedule_todo_callback=schedule_todo_callback,
+        twilio_daily_message_limit=settings.twilio_daily_message_limit,
         assistant_name=settings.assistant_name,
         enable_tools=True,
     )

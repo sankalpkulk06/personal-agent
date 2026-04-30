@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any, Optional
 
@@ -7,6 +8,8 @@ from app.core.habit_service import HabitService
 from app.services.news_service import NewsService
 from app.services.whatsapp_service import WhatsAppService
 from app.storage.sqlite_registry import SQLiteRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def build_scheduler(
@@ -18,7 +21,13 @@ def build_scheduler(
     morning_briefing_time: str = "08:00",
     habit_nudge_time: str = "21:00",
 ) -> BackgroundScheduler:
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(
+        job_defaults={
+            "coalesce": True,
+            "max_instances": 1,
+            "misfire_grace_time": None,
+        }
+    )
 
     habit_hour, habit_minute = _parse_hhmm(habit_nudge_time)
     scheduler.add_job(
@@ -100,10 +109,12 @@ def send_todo_reminder(
     if not todo or todo.get("completed_at") or todo.get("notified_at"):
         return
 
-    whatsapp_service.send_message(
-        to=your_number,
-        body=f"Reminder: *{todo['title']}* is due now.",
-    )
+    if not _safe_send(
+        whatsapp_service,
+        your_number,
+        f"Reminder: *{todo['title']}* is due now.",
+    ):
+        return
     registry.mark_todo_notified(todo_id)
 
 
@@ -124,13 +135,16 @@ def check_habits_and_nudge(
 ) -> None:
     for habit in habit_service.get_unlogged_today():
         registry.set_nudge_context(your_number, habit.id)
-        whatsapp_service.send_message(
-            to=your_number,
-            body=(
+        sent = _safe_send(
+            whatsapp_service,
+            your_number,
+            (
                 f"Hey - you haven't logged *{habit.name}* today. Still happening?\n\n"
                 "Reply 'done' or 'skipped' to log it."
             ),
         )
+        if not sent:
+            registry.clear_nudge_context(your_number)
 
 
 def send_morning_briefing(
@@ -168,7 +182,7 @@ def send_morning_briefing(
         lines.append("- Nothing due")
 
     lines.extend(["", "Have a great day!"])
-    whatsapp_service.send_message(to=your_number, body="\n".join(lines))
+    _safe_send(whatsapp_service, your_number, "\n".join(lines))
 
 
 def _parse_hhmm(raw: str) -> tuple[int, int]:
@@ -195,3 +209,12 @@ def _format_due_label(value: Any) -> str:
     if due_at is None:
         return ""
     return f" ({due_at.strftime('%-I:%M %p')})"
+
+
+def _safe_send(whatsapp_service: WhatsAppService, to: str, body: str) -> bool:
+    try:
+        whatsapp_service.send_message(to=to, body=body)
+        return True
+    except Exception:
+        logger.exception("Failed to send WhatsApp message to %s", to)
+        return False

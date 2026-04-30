@@ -59,6 +59,11 @@ class _WhatsApp:
         self.messages.append((to, body))
 
 
+class _FailingWhatsApp:
+    def send_message(self, to, body):
+        raise RuntimeError("Twilio limit")
+
+
 def test_nudge_reply_logs_habit_and_skips_chat(monkeypatch):
     registry = _Registry(pending="habit-1")
     habit_service = _HabitService()
@@ -94,3 +99,18 @@ def test_unknown_nudge_reply_falls_through_to_chat(monkeypatch):
     assert habit_service.logged == []
     assert chat_service.calls == [("session", "maybe later", "whatsapp")]
     assert whatsapp.messages == [("whatsapp:+1", "chat reply")]
+
+
+def test_send_failure_still_returns_successful_webhook_response(monkeypatch):
+    registry = _Registry()
+    chat_service = _ChatService()
+    monkeypatch.setattr(server, "_registry", registry)
+    monkeypatch.setattr(server, "_habit_service", _HabitService())
+    monkeypatch.setattr(server, "_chat_service", chat_service)
+    monkeypatch.setattr(server, "_whatsapp_service", _FailingWhatsApp())
+
+    response = asyncio.run(server.webhook(From="whatsapp:+1", Body="hello"))
+
+    assert response.status_code == 200
+    assert chat_service.calls == [("session", "hello", "whatsapp")]
+    assert registry.updated == ["whatsapp:+1"]

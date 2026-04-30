@@ -1,7 +1,7 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -246,6 +246,88 @@ class SQLiteRegistry:
         self._connection.execute(
             "UPDATE whatsapp_sessions SET last_active = CURRENT_TIMESTAMP WHERE phone_number = ?",
             (phone_number,),
+        )
+        self._connection.commit()
+
+    def record_whatsapp_message_sent(self, usage_date: Optional[date] = None) -> int:
+        day = (usage_date or date.today()).isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO whatsapp_usage_daily (usage_date, sent_count, updated_at)
+            VALUES (?, 1, CURRENT_TIMESTAMP)
+            ON CONFLICT(usage_date) DO UPDATE SET
+                sent_count = sent_count + 1,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (day,),
+        )
+        row = self._connection.execute(
+            "SELECT sent_count FROM whatsapp_usage_daily WHERE usage_date = ?",
+            (day,),
+        ).fetchone()
+        self._connection.commit()
+        return int(row["sent_count"])
+
+    def get_whatsapp_usage_today(self, daily_limit: int = 50) -> Dict[str, object]:
+        day = date.today().isoformat()
+        row = self._connection.execute(
+            "SELECT sent_count FROM whatsapp_usage_daily WHERE usage_date = ?",
+            (day,),
+        ).fetchone()
+        sent_count = int(row["sent_count"]) if row else 0
+        return {
+            "date": day,
+            "sent_count": sent_count,
+            "daily_limit": daily_limit,
+            "remaining": max(daily_limit - sent_count, 0),
+        }
+
+    def get_chat_usage_today(self) -> Dict[str, object]:
+        day = date.today().isoformat()
+        rows = self._connection.execute(
+            """
+            SELECT
+                CASE
+                    WHEN ws.session_id IS NOT NULL THEN 'whatsapp'
+                    WHEN ns.name LIKE 'cli:%' THEN 'cli'
+                    ELSE 'other'
+                END AS source,
+                COUNT(*) AS count
+            FROM chat_turns ct
+            LEFT JOIN whatsapp_sessions ws ON ws.session_id = ct.session_id
+            LEFT JOIN named_sessions ns ON ns.session_id = ct.session_id
+            WHERE ct.role = 'user'
+              AND DATE(ct.created_at) = ?
+            GROUP BY source
+            """,
+            (day,),
+        ).fetchall()
+        counts = {"cli": 0, "whatsapp": 0, "other": 0}
+        for row in rows:
+            counts[row["source"]] = int(row["count"])
+        counts["date"] = day
+        counts["total"] = counts["cli"] + counts["whatsapp"] + counts["other"]
+        return counts
+
+    def has_whatsapp_usage_alert_sent(self, threshold: int, usage_date: Optional[date] = None) -> bool:
+        day = (usage_date or date.today()).isoformat()
+        row = self._connection.execute(
+            """
+            SELECT 1 FROM whatsapp_usage_alerts
+            WHERE usage_date = ? AND threshold = ?
+            """,
+            (day, threshold),
+        ).fetchone()
+        return row is not None
+
+    def mark_whatsapp_usage_alert_sent(self, threshold: int, usage_date: Optional[date] = None) -> None:
+        day = (usage_date or date.today()).isoformat()
+        self._connection.execute(
+            """
+            INSERT OR IGNORE INTO whatsapp_usage_alerts (usage_date, threshold)
+            VALUES (?, ?)
+            """,
+            (day, threshold),
         )
         self._connection.commit()
 

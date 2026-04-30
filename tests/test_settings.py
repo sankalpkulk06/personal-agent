@@ -22,6 +22,7 @@ def test_settings_load_from_dotenv_and_env_override(tmp_path, monkeypatch):
     assert settings.scheduler_enabled is True
     assert settings.morning_briefing_time == "08:00"
     assert settings.habit_nudge_time == "21:00"
+    assert settings.twilio_daily_message_limit == 50
 
 
 def test_settings_loads_reminders_list_override(tmp_path):
@@ -42,7 +43,8 @@ def test_settings_loads_scheduler_overrides(tmp_path):
         "SCHEDULER_ENABLED=false\n"
         "MORNING_BRIEFING_TIME=07:30\n"
         "HABIT_NUDGE_TIME=20:45\n"
-        "YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234\n",
+        "YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234\n"
+        "TWILIO_DAILY_MESSAGE_LIMIT=75\n",
         encoding="utf-8",
     )
 
@@ -52,6 +54,7 @@ def test_settings_loads_scheduler_overrides(tmp_path):
     assert settings.morning_briefing_time == "07:30"
     assert settings.habit_nudge_time == "20:45"
     assert settings.your_whatsapp_number == "whatsapp:+14155551234"
+    assert settings.twilio_daily_message_limit == 75
 
 
 def test_settings_resolve_local_paths(tmp_path):

@@ -40,10 +40,28 @@ def test_sqlite_registry_initializes_schema(tmp_path):
     registry = SQLiteRegistry(db_path=db_path)
     try:
         document_tables = registry._connection.execute(  # noqa: SLF001
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents', 'chunks', 'todos', 'nudge_context')"
+            """
+            SELECT name FROM sqlite_master
+            WHERE type='table'
+              AND name IN (
+                'documents',
+                'chunks',
+                'todos',
+                'nudge_context',
+                'whatsapp_usage_daily',
+                'whatsapp_usage_alerts'
+              )
+            """
         ).fetchall()
         table_names = sorted([row["name"] for row in document_tables])
-        assert table_names == ["chunks", "documents", "nudge_context", "todos"]
+        assert table_names == [
+            "chunks",
+            "documents",
+            "nudge_context",
+            "todos",
+            "whatsapp_usage_alerts",
+            "whatsapp_usage_daily",
+        ]
     finally:
         registry.close()
 
@@ -95,6 +113,49 @@ def test_nudge_context_persists_and_expires(tmp_path):
         )
         registry._connection.commit()  # noqa: SLF001
         assert registry.get_nudge_context("whatsapp:+1") is None
+    finally:
+        registry.close()
+
+
+def test_whatsapp_usage_tracks_count_and_alert_flags(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        assert registry.get_whatsapp_usage_today(daily_limit=50)["sent_count"] == 0
+
+        assert registry.record_whatsapp_message_sent() == 1
+        assert registry.record_whatsapp_message_sent() == 2
+
+        usage = registry.get_whatsapp_usage_today(daily_limit=50)
+        assert usage["sent_count"] == 2
+        assert usage["remaining"] == 48
+
+        assert registry.has_whatsapp_usage_alert_sent(25) is False
+        registry.mark_whatsapp_usage_alert_sent(25)
+        assert registry.has_whatsapp_usage_alert_sent(25) is True
+    finally:
+        registry.close()
+
+
+def test_chat_usage_counts_cli_and_whatsapp_user_turns(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        cli_session = registry.get_or_create_named_session("cli:default")
+        whatsapp_session = registry.get_or_create_whatsapp_session("whatsapp:+1")
+        other_session = "other-session"
+        registry.create_session(other_session)
+
+        registry.append_turn(cli_session, "cli-user-1", "user", "hello", 0)
+        registry.append_turn(cli_session, "cli-assistant-1", "assistant", "hi", 1)
+        registry.append_turn(whatsapp_session, "wa-user-1", "user", "hello", 0)
+        registry.append_turn(whatsapp_session, "wa-user-2", "user", "again", 1)
+        registry.append_turn(other_session, "other-user-1", "user", "other", 0)
+
+        usage = registry.get_chat_usage_today()
+
+        assert usage["cli"] == 1
+        assert usage["whatsapp"] == 2
+        assert usage["other"] == 1
+        assert usage["total"] == 4
     finally:
         registry.close()
 

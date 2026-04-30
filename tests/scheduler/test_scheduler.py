@@ -19,6 +19,11 @@ class _WhatsApp:
         self.messages.append((to, body))
 
 
+class _FailingWhatsApp:
+    def send_message(self, to, body):
+        raise RuntimeError("Twilio limit")
+
+
 class _News:
     def get_top_news(self, max_results=None):
         return [
@@ -62,6 +67,22 @@ def test_scan_due_todos_sends_and_marks_notified(tmp_path):
         stored = registry.get_todo(todo["id"])
         assert whatsapp.messages == [("whatsapp:+1", "Reminder: *Take trash out* is due now.")]
         assert stored["notified_at"] is not None
+    finally:
+        registry.close()
+
+
+def test_scan_due_todos_does_not_mark_notified_when_send_fails(tmp_path):
+    registry = SQLiteRegistry(tmp_path / "registry.db")
+    try:
+        todo = registry.create_todo(
+            "Take trash out",
+            due_at=datetime.now() - timedelta(minutes=1),
+        )
+
+        scan_due_todos(_FailingWhatsApp(), registry, "whatsapp:+1")
+
+        stored = registry.get_todo(todo["id"])
+        assert stored["notified_at"] is None
     finally:
         registry.close()
 

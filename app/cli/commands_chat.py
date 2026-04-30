@@ -288,6 +288,7 @@ def _print_help() -> None:
         ("/email", "Check personal email and triage action items"),
         ("/news [query]", "Fetch live news"),
         ("/search <query>", "Search the web for current information"),
+        ("/usage", "Show today's Twilio WhatsApp usage"),
         ("/todo <task> [#list] [@due]", "Add a Sage reminder"),
         ("/apple-reminder <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("/habit add <name> [@time]", "Track a new habit (optional reminder time)"),

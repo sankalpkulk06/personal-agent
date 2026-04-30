@@ -74,6 +74,19 @@ CREATE TABLE IF NOT EXISTS whatsapp_sessions (
     last_active   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS whatsapp_usage_daily (
+    usage_date  TEXT PRIMARY KEY,
+    sent_count  INTEGER NOT NULL DEFAULT 0,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_usage_alerts (
+    usage_date  TEXT NOT NULL,
+    threshold   INTEGER NOT NULL,
+    sent_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (usage_date, threshold)
+);
+
 CREATE TABLE IF NOT EXISTS habits (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL COLLATE NOCASE,
