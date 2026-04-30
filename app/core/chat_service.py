@@ -1,7 +1,7 @@
 import re
 import uuid
-from datetime import date
-from typing import List, Optional
+from datetime import date, datetime
+from typing import Any, Callable, List, Optional
 
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
@@ -10,6 +10,7 @@ from app.services.news_service import NewsService, NewsArticle
 from app.services.reminders_service import RemindersService
 from app.core.tool_executor import ToolExecutor
 from app.core.tools import ToolRegistry
+from app.core.todo_parser import parse_due_date, parse_reminder_request
 from app.services.web_search_service import WebSearchService
 from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
@@ -62,6 +63,7 @@ class ChatService:
         reminders_service: Optional[RemindersService] = None,
         web_search_service: Optional[WebSearchService] = None,
         habit_service: Optional[HabitService] = None,
+        schedule_todo_callback: Optional[Callable[[dict[str, Any]], None]] = None,
         max_prompt_chunks: int = 5,
         assistant_name: str = "Sage",
         enable_tools: bool = True,
@@ -74,6 +76,7 @@ class ChatService:
         self._reminders_service = reminders_service
         self._web_search_service = web_search_service
         self._habit_service = habit_service
+        self._schedule_todo_callback = schedule_todo_callback
         self._max_prompt_chunks = max_prompt_chunks
         self._assistant_name = assistant_name
         self._enable_tools = enable_tools
@@ -82,7 +85,9 @@ class ChatService:
         self._tool_registry = ToolRegistry(
             news_service=news_service,
             fact_service=fact_service,
+            registry=registry,
             reminders_service=reminders_service,
+            schedule_todo_callback=schedule_todo_callback,
             retriever=retriever,
             web_search_service=web_search_service,
             habit_service=habit_service,
@@ -168,6 +173,15 @@ class ChatService:
             QAResult with the answer and sources
         """
         history = self.get_history(session_id)
+
+        reminder_answer = self._answer_direct_reminder_request(question, response_style=response_style)
+        if reminder_answer is not None:
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=reminder_answer,
+                history=history,
+            )
 
         direct_answer = self._answer_direct_command(question, response_style=response_style)
         if direct_answer is not None:
@@ -399,6 +413,14 @@ class ChatService:
             self._fact_service.forget(fact_id)
             return self._style_status("Fact forgotten.", "🗑️", response_style)
 
+        if lowered == "/todo" or lowered.startswith("/todo "):
+            args = command[len("/todo"):].strip()
+            return self._todo_command(args, response_style=response_style)
+
+        if lowered == "/apple-reminder" or lowered.startswith("/apple-reminder "):
+            args = command[len("/apple-reminder"):].strip()
+            return self._apple_reminder_command(args, response_style=response_style)
+
         if lowered == "/habits":
             if not self._habit_service:
                 return self._style_status("Habit tracking is not configured.", "⚠️", response_style)
@@ -472,6 +494,47 @@ class ChatService:
             return f"🌱 *Habit commands*\n{help_text}" if self._is_whatsapp_style(response_style) else help_text
 
         return None
+
+    def _answer_direct_reminder_request(
+        self, question: str, response_style: Optional[str] = None
+    ) -> Optional[str]:
+        if "apple reminder" in question.lower() or "apple reminders" in question.lower():
+            return None
+
+        parsed = parse_reminder_request(question)
+        if parsed is None:
+            return None
+
+        task, due_at = parsed
+        todo = self._registry.create_todo(title=task, due_at=due_at)
+        if due_at and self._schedule_todo_callback:
+            self._schedule_todo_callback(todo)
+        due_str = f" due {due_at.strftime('%a, %b %d at %I:%M%p')}" if due_at else ""
+        return self._style_status(f"Added Sage reminder: {todo['title']}{due_str}.", "✅", response_style)
+
+    def _todo_command(self, args: str, response_style: Optional[str] = None) -> str:
+        if not args:
+            return self._style_status("Usage: /todo <task> [#list] [@due-date]", "📝", response_style)
+        task, list_name, due_at = self._parse_task_list_and_due_date(args)
+        if not task:
+            return self._style_status("Usage: /todo <task> [#list] [@due-date]", "📝", response_style)
+        todo = self._registry.create_todo(title=task, list_name=list_name, due_at=due_at)
+        if due_at and self._schedule_todo_callback:
+            self._schedule_todo_callback(todo)
+        due_str = f" due {due_at.strftime('%a, %b %d at %I:%M%p')}" if due_at else ""
+        return self._style_status(f"Added Sage reminder: {todo['title']}{due_str}.", "✅", response_style)
+
+    def _apple_reminder_command(self, args: str, response_style: Optional[str] = None) -> str:
+        if not self._reminders_service:
+            return self._style_status("Apple Reminders is not configured.", "⚠️", response_style)
+        if not args:
+            return self._style_status("Usage: /apple-reminder <task> [#list] [@due-date]", "📝", response_style)
+        task, list_name, due_at = self._parse_task_list_and_due_date(args)
+        if not task:
+            return self._style_status("Usage: /apple-reminder <task> [#list] [@due-date]", "📝", response_style)
+        target_list = self._reminders_service.add_reminder(task=task, list_name=list_name, due_date=due_at)
+        due_str = f" due {due_at.strftime('%a, %b %d at %I:%M%p')}" if due_at else ""
+        return self._style_status(f"Added to Apple Reminders {target_list}: {task}{due_str}.", "✅", response_style)
 
     def _style_status(self, text: str, emoji: str, response_style: Optional[str]) -> str:
         if self._is_whatsapp_style(response_style):
@@ -564,6 +627,29 @@ class ChatService:
             name = args[: match.start()].strip()
             return name, time_str
         return args.strip(), "21:00"
+
+    @staticmethod
+    def _parse_task_list_and_due_date(args: str) -> tuple[str, Optional[str], Optional[datetime]]:
+        working = args.strip()
+        list_name = None
+        due_at = None
+
+        if "#" in working:
+            task_part, list_part = working.rsplit("#", 1)
+            if "@" in list_part:
+                list_only, date_only = list_part.split("@", 1)
+                list_name = list_only.strip() or None
+                working = f"{task_part.strip()} @{date_only}"
+            else:
+                list_name = list_part.strip() or None
+                working = task_part.strip()
+
+        if "@" in working:
+            task_part, date_part = working.rsplit("@", 1)
+            due_at = parse_due_date(date_part.strip())
+            working = task_part.strip()
+
+        return working, list_name, due_at
 
     def _format_habit_summary(self, response_style: Optional[str] = None) -> str:
         summaries = self._habit_service.get_weekly_summary() if self._habit_service else []

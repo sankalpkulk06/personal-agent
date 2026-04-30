@@ -65,6 +65,15 @@ class HabitService:
             return None
         return Habit(id=row["id"], name=row["name"], reminder_time=row["reminder_time"], active=bool(row["active"]))
 
+    def get_habit_by_id(self, habit_id: str) -> Optional[Habit]:
+        row = self._db.execute(
+            "SELECT id, name, reminder_time, active FROM habits WHERE id = ? AND active = 1",
+            (habit_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return Habit(id=row["id"], name=row["name"], reminder_time=row["reminder_time"], active=bool(row["active"]))
+
     def _get_all_active(self) -> list[Habit]:
         rows = self._db.execute(
             "SELECT id, name, reminder_time, active FROM habits WHERE active = 1 ORDER BY created_at ASC"
@@ -92,14 +101,20 @@ class HabitService:
         habit = self._get_habit_by_name(name)
         if habit is None:
             raise ValueError(f"Habit '{name}' not found. Add it first with /habit add {name}")
+        return self.log_habit_by_id(habit.id, status=status, note=note)
+
+    def log_habit_by_id(self, habit_id: str, status: str = "done", note: str = "") -> HabitLog:
+        habit = self.get_habit_by_id(habit_id)
+        if habit is None:
+            raise ValueError(f"Habit '{habit_id}' not found.")
         log_id = str(uuid.uuid4())
         now = datetime.now()
         self._db.execute(
             "INSERT INTO habit_logs (id, habit_id, logged_at, status, note) VALUES (?, ?, ?, ?, ?)",
-            (log_id, habit.id, now.isoformat(), status, note),
+            (log_id, habit_id, now.isoformat(), status, note),
         )
         self._db.commit()
-        return HabitLog(id=log_id, habit_id=habit.id, logged_at=now, status=status, note=note)
+        return HabitLog(id=log_id, habit_id=habit_id, logged_at=now, status=status, note=note)
 
     def unlog_habit(self, name: str) -> int:
         """Delete all log entries for today for the given habit. Returns rows deleted."""

@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from app.schemas.chunk import DocumentChunk
 from app.schemas.document import ParsedDocument
@@ -39,10 +40,61 @@ def test_sqlite_registry_initializes_schema(tmp_path):
     registry = SQLiteRegistry(db_path=db_path)
     try:
         document_tables = registry._connection.execute(  # noqa: SLF001
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents', 'chunks')"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents', 'chunks', 'todos', 'nudge_context')"
         ).fetchall()
         table_names = sorted([row["name"] for row in document_tables])
-        assert table_names == ["chunks", "documents"]
+        assert table_names == ["chunks", "documents", "nudge_context", "todos"]
+    finally:
+        registry.close()
+
+
+def test_todo_queries_exclude_completed_and_notified(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        due = datetime.now() + timedelta(minutes=30)
+        overdue = datetime.now() - timedelta(minutes=5)
+        future = datetime.now() + timedelta(hours=2)
+
+        due_todo = registry.create_todo("Pay bill", due_at=due)
+        notified = registry.create_todo("Already nudged", due_at=overdue)
+        completed = registry.create_todo("Already done", due_at=overdue)
+        future_todo = registry.create_todo("Later", due_at=future)
+        registry.create_todo("No due date")
+
+        registry.mark_todo_notified(notified["id"])
+        registry.mark_todo_completed(completed["id"])
+
+        due_soon = registry.get_todos_due_soon(minutes_ahead=60)
+        pending = registry.get_pending_todos()
+
+        assert [todo["id"] for todo in due_soon] == [due_todo["id"]]
+        assert {todo["id"] for todo in pending} == {due_todo["id"], future_todo["id"]}
+    finally:
+        registry.close()
+
+
+def test_nudge_context_persists_and_expires(tmp_path):
+    db_path = tmp_path / "registry.db"
+    registry = SQLiteRegistry(db_path=db_path)
+    try:
+        habit = registry._connection.execute(  # noqa: SLF001
+            "INSERT INTO habits (id, name) VALUES (?, ?) RETURNING id",
+            ("habit-1", "gym"),
+        ).fetchone()
+        registry.set_nudge_context("whatsapp:+1", habit["id"])
+        assert registry.get_nudge_context("whatsapp:+1") == "habit-1"
+    finally:
+        registry.close()
+
+    registry = SQLiteRegistry(db_path=db_path)
+    try:
+        assert registry.get_nudge_context("whatsapp:+1") == "habit-1"
+        registry._connection.execute(  # noqa: SLF001
+            "UPDATE nudge_context SET sent_at = ? WHERE phone_number = ?",
+            ((datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"), "whatsapp:+1"),
+        )
+        registry._connection.commit()  # noqa: SLF001
+        assert registry.get_nudge_context("whatsapp:+1") is None
     finally:
         registry.close()
 
@@ -111,4 +163,3 @@ def test_sqlite_registry_repeated_upsert_updates_values(tmp_path):
         assert stored_chunk["char_end"] == len("Hello updated")
     finally:
         registry.close()
-

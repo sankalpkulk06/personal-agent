@@ -4,7 +4,6 @@ from typer.testing import CliRunner
 
 from app.cli.app import cli
 from app.core.qa_service import QAResult
-from app.services.reminders_service import RemindersServiceError
 from app.retrieval.retriever import RetrievalResult, RetrievedChunk
 
 
@@ -35,6 +34,22 @@ class _StubFactService:
 
 class _StubRegistry:
     """Minimal registry stub for HabitService initialization in tests."""
+    def __init__(self):
+        self.todos = []
+
+    def get_or_create_named_session(self, name):
+        return f"session-{name}"
+
+    def create_todo(self, title, list_name=None, due_at=None):
+        todo = {
+            "id": f"todo-{len(self.todos) + 1}",
+            "title": title,
+            "list_name": list_name,
+            "due_at": due_at,
+        }
+        self.todos.append(todo)
+        return todo
+
     class _conn:
         row_factory = None
 
@@ -59,6 +74,7 @@ class _StubChatService:
         self._result = result
         self.answer_calls = []
         self.created_sessions = []
+        self.registry = _StubRegistry()
 
     def create_session(self, session_id, title=""):
         self.created_sessions.append((session_id, title))
@@ -73,7 +89,7 @@ class _StubChatService:
         return None
 
     def get_registry(self):
-        return _StubRegistry()
+        return self.registry
 
     def list_sessions(self, limit=10):
         return []
@@ -97,8 +113,8 @@ class _StubRemindersService:
         self.error = error
         self.calls = []
 
-    def add_reminder(self, task):
-        self.calls.append(task)
+    def add_reminder(self, task, list_name=None, due_date=None):
+        self.calls.append((task, list_name, due_date))
         if self.error:
             raise self.error
         return self.default_list_name
@@ -158,9 +174,8 @@ def test_chat_command_single_turn_and_exit(monkeypatch):
     assert "Sage — Your Personal AI" in result.stdout
     assert "Chat answer" in result.stdout
     assert "sample.md" in result.stdout
-    assert len(chat_service.created_sessions) == 1
-    session_id, title = chat_service.created_sessions[0]
-    assert title == ""
+    assert "session-cli:default" in result.stdout
+    session_id = "session-cli:default"
     assert chat_service.answer_calls == [(session_id, "What is in sample.md?", None)]
 
 
@@ -172,7 +187,7 @@ def test_chat_command_topk_command(monkeypatch):
 
     assert result.exit_code == 0
     assert "Retrieval depth set to" in result.stdout
-    session_id, _ = chat_service.created_sessions[0]
+    session_id = "session-cli:default"
     assert chat_service.answer_calls == [(session_id, "What now?", 2)]
 
 
@@ -184,10 +199,10 @@ def test_chat_command_todo_adds_reminder_without_hitting_llm(monkeypatch):
     result = runner.invoke(cli, ["chat"])
 
     assert result.exit_code == 0
-    assert "Added todo to" in result.stdout
-    assert "Errands" in result.stdout
+    assert "Added Sage reminder" in result.stdout
     assert "Buy oat milk" in result.stdout
-    assert reminders_service.calls == ["Buy oat milk"]
+    assert reminders_service.calls == []
+    assert chat_service.registry.todos[0]["title"] == "Buy oat milk"
     assert chat_service.answer_calls == []
 
 
@@ -204,16 +219,17 @@ def test_chat_command_todo_without_task_shows_usage(monkeypatch):
     assert reminders_service.calls == []
 
 
-def test_chat_command_todo_failure_prints_error_and_continues(monkeypatch):
+def test_chat_command_apple_reminder_explicitly_uses_apple(monkeypatch):
     chat_service = _StubChatService(_qa_result("unused"))
     reminders_service = _StubRemindersService(
-        error=RemindersServiceError("Reminders access was denied.")
+        list_name="Errands"
     )
-    _patch_chat_dependencies(monkeypatch, ["/todo Buy oat milk", "quit"], chat_service, reminders_service)
+    _patch_chat_dependencies(monkeypatch, ["/apple-reminder Buy oat milk", "quit"], chat_service, reminders_service)
 
     result = runner.invoke(cli, ["chat"])
 
     assert result.exit_code == 0
-    assert "Reminders access was denied." in result.stdout
-    assert reminders_service.calls == ["Buy oat milk"]
+    assert "Added Apple Reminder" in result.stdout
+    assert reminders_service.calls[0][0] == "Buy oat milk"
+    assert chat_service.registry.todos == []
     assert chat_service.answer_calls == []

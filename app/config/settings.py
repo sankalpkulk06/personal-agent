@@ -35,6 +35,10 @@ class Settings(BaseModel):
     twilio_whatsapp_number: str = ""  # e.g. "whatsapp:+14155238886"
     webhook_port: int = 8000
     whatsapp_enabled: bool = True
+    scheduler_enabled: bool = True
+    morning_briefing_time: str = "08:00"
+    habit_nudge_time: str = "21:00"
+    your_whatsapp_number: str = ""  # e.g. "whatsapp:+14155551234"
 
     data_dir: Optional[Path] = None
 

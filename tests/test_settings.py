@@ -19,6 +19,9 @@ def test_settings_load_from_dotenv_and_env_override(tmp_path, monkeypatch):
     assert settings.chunk_size == 1024
     assert settings.chunk_overlap == 100
     assert settings.reminders_default_list == "Reminders"
+    assert settings.scheduler_enabled is True
+    assert settings.morning_briefing_time == "08:00"
+    assert settings.habit_nudge_time == "21:00"
 
 
 def test_settings_loads_reminders_list_override(tmp_path):
@@ -31,6 +34,24 @@ def test_settings_loads_reminders_list_override(tmp_path):
     settings = Settings.from_env(project_root=tmp_path)
 
     assert settings.reminders_default_list == "Errands"
+
+
+def test_settings_loads_scheduler_overrides(tmp_path):
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text(
+        "SCHEDULER_ENABLED=false\n"
+        "MORNING_BRIEFING_TIME=07:30\n"
+        "HABIT_NUDGE_TIME=20:45\n"
+        "YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings.from_env(project_root=tmp_path)
+
+    assert settings.scheduler_enabled is False
+    assert settings.morning_briefing_time == "07:30"
+    assert settings.habit_nudge_time == "20:45"
+    assert settings.your_whatsapp_number == "whatsapp:+14155551234"
 
 
 def test_settings_resolve_local_paths(tmp_path):

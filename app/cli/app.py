@@ -14,7 +14,7 @@ from app.cli.commands_serve import serve_command
 cli = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Sage — Your personal AI companion with memory and knowledge.",
+    help="Local-first personal RAG agent CLI.",
 )
 
 
