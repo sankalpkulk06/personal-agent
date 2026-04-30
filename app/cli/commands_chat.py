@@ -1,11 +1,9 @@
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Tuple
 
 import typer
-from dateutil import parser as date_parser
-from dateutil.relativedelta import relativedelta
 from prompt_toolkit import PromptSession
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.history import InMemoryHistory
@@ -22,6 +20,7 @@ from app.cli.commands_ask import (
 )
 from app.config import get_settings
 from app.core.habit_service import HabitService
+from app.core.todo_parser import parse_due_date
 from app.services.email_service import EmailService
 from app.services.reminders_service import RemindersServiceError
 from app.providers.ollama_chat import OllamaChatProvider
@@ -166,22 +165,7 @@ def _parse_task_list_and_due_date(input_str: str) -> Tuple[str, Optional[str], O
 
         if date_str:
             try:
-                now = datetime.now()
-                today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-                # Handle simple relative dates
-                if date_str == "today":
-                    due_date = now
-                elif date_str == "tomorrow":
-                    due_date = today + timedelta(days=1)
-                elif date_str == "tonight":
-                    due_date = now.replace(hour=21, minute=0, second=0, microsecond=0)
-                else:
-                    # Try to parse as full date/time string
-                    due_date = date_parser.parse(date_str, fuzzy=True)
-                    # If only time was provided (year=1900), apply to today
-                    if due_date.year == 1900:
-                        due_date = today.replace(hour=due_date.hour, minute=due_date.minute, second=due_date.second)
+                due_date = parse_due_date(date_str)
             except (ValueError, TypeError, OverflowError):
                 # If parsing fails, ignore and keep working_str as-is
                 task_part = working_str
@@ -304,7 +288,9 @@ def _print_help() -> None:
         ("/email", "Check personal email and triage action items"),
         ("/news [query]", "Fetch live news"),
         ("/search <query>", "Search the web for current information"),
-        ("/todo <task> [#list] [@due]", "Add a task to Apple Reminders"),
+        ("/usage", "Show today's Twilio WhatsApp usage"),
+        ("/todo <task> [#list] [@due]", "Add a Sage reminder"),
+        ("/apple-reminder <task> [#list] [@due]", "Add a task to Apple Reminders"),
         ("/habit add <name> [@time]", "Track a new habit (optional reminder time)"),
         ("/habit log <name> [skipped]", "Log a habit as done or skipped"),
         ("/habit unlog <name>", "Remove today's log entry for a habit"),
@@ -325,6 +311,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     news_service = create_news_service()
     reminders_service = create_reminders_service()
     habit_service = service.get_habit_service() or HabitService(service.get_registry())
+    registry = service.get_registry()
 
     # Create chat provider for news summary generation
     settings = get_settings()
@@ -596,10 +583,31 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
                     console.print("\n[yellow]Usage:[/yellow] /todo <task> [#list] [@due-date]\n")
                     continue
 
+                registry.create_todo(title=task, list_name=list_name, due_at=due_date)
+                due_date_str = f" due {due_date.strftime('%a, %b %d at %I:%M%p')}" if due_date else ""
+                console.print(
+                    f"\n[green]✓[/green] Added Sage reminder: {task}{due_date_str}\n"
+                )
+            except Exception as exc:
+                console.print(f"\n[red]✗[/red] Could not add Sage reminder: {exc}\n")
+            continue
+
+        if lowered == "/apple-reminder" or lowered.startswith("/apple-reminder "):
+            task_input = question[len("/apple-reminder"):].strip()
+            if not task_input:
+                console.print("\n[yellow]Usage:[/yellow] /apple-reminder <task> [#list] [@due-date]\n")
+                continue
+
+            try:
+                task, list_name, due_date = _parse_task_list_and_due_date(task_input)
+                if not task:
+                    console.print("\n[yellow]Usage:[/yellow] /apple-reminder <task> [#list] [@due-date]\n")
+                    continue
+
                 target_list = reminders_service.add_reminder(task=task, list_name=list_name, due_date=due_date)
                 due_date_str = f" due {due_date.strftime('%a, %b %d at %I:%M%p')}" if due_date else ""
                 console.print(
-                    f"\n[green]✓[/green] Added todo to [bold]{target_list}[/bold]: {task}{due_date_str}\n"
+                    f"\n[green]✓[/green] Added Apple Reminder to [bold]{target_list}[/bold]: {task}{due_date_str}\n"
                 )
             except RemindersServiceError as exc:
                 console.print(f"\n[red]✗[/red] {exc}\n")

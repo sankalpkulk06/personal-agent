@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import uuid
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -12,7 +13,7 @@ class SQLiteRegistry:
     def __init__(self, db_path: Path):
         self.db_path = db_path.resolve()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(self.db_path.as_posix())
+        self._connection = sqlite3.connect(self.db_path.as_posix(), check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON;")
         self.initialize_schema()
@@ -248,6 +249,191 @@ class SQLiteRegistry:
         )
         self._connection.commit()
 
+    def record_whatsapp_message_sent(self, usage_date: Optional[date] = None) -> int:
+        day = (usage_date or date.today()).isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO whatsapp_usage_daily (usage_date, sent_count, updated_at)
+            VALUES (?, 1, CURRENT_TIMESTAMP)
+            ON CONFLICT(usage_date) DO UPDATE SET
+                sent_count = sent_count + 1,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (day,),
+        )
+        row = self._connection.execute(
+            "SELECT sent_count FROM whatsapp_usage_daily WHERE usage_date = ?",
+            (day,),
+        ).fetchone()
+        self._connection.commit()
+        return int(row["sent_count"])
+
+    def get_whatsapp_usage_today(self, daily_limit: int = 50) -> Dict[str, object]:
+        day = date.today().isoformat()
+        row = self._connection.execute(
+            "SELECT sent_count FROM whatsapp_usage_daily WHERE usage_date = ?",
+            (day,),
+        ).fetchone()
+        sent_count = int(row["sent_count"]) if row else 0
+        return {
+            "date": day,
+            "sent_count": sent_count,
+            "daily_limit": daily_limit,
+            "remaining": max(daily_limit - sent_count, 0),
+        }
+
+    def get_chat_usage_today(self) -> Dict[str, object]:
+        day = date.today().isoformat()
+        rows = self._connection.execute(
+            """
+            SELECT
+                CASE
+                    WHEN ws.session_id IS NOT NULL THEN 'whatsapp'
+                    WHEN ns.name LIKE 'cli:%' THEN 'cli'
+                    ELSE 'other'
+                END AS source,
+                COUNT(*) AS count
+            FROM chat_turns ct
+            LEFT JOIN whatsapp_sessions ws ON ws.session_id = ct.session_id
+            LEFT JOIN named_sessions ns ON ns.session_id = ct.session_id
+            WHERE ct.role = 'user'
+              AND DATE(ct.created_at) = ?
+            GROUP BY source
+            """,
+            (day,),
+        ).fetchall()
+        counts = {"cli": 0, "whatsapp": 0, "other": 0}
+        for row in rows:
+            counts[row["source"]] = int(row["count"])
+        counts["date"] = day
+        counts["total"] = counts["cli"] + counts["whatsapp"] + counts["other"]
+        return counts
+
+    def has_whatsapp_usage_alert_sent(self, threshold: int, usage_date: Optional[date] = None) -> bool:
+        day = (usage_date or date.today()).isoformat()
+        row = self._connection.execute(
+            """
+            SELECT 1 FROM whatsapp_usage_alerts
+            WHERE usage_date = ? AND threshold = ?
+            """,
+            (day, threshold),
+        ).fetchone()
+        return row is not None
+
+    def mark_whatsapp_usage_alert_sent(self, threshold: int, usage_date: Optional[date] = None) -> None:
+        day = (usage_date or date.today()).isoformat()
+        self._connection.execute(
+            """
+            INSERT OR IGNORE INTO whatsapp_usage_alerts (usage_date, threshold)
+            VALUES (?, ?)
+            """,
+            (day, threshold),
+        )
+        self._connection.commit()
+
+    def create_todo(
+        self,
+        title: str,
+        list_name: Optional[str] = None,
+        due_at: Optional[datetime] = None,
+    ) -> Dict[str, object]:
+        todo_id = str(uuid.uuid4())
+        self._connection.execute(
+            """
+            INSERT INTO todos (id, title, list_name, due_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (todo_id, title, list_name, self._format_datetime(due_at)),
+        )
+        self._connection.commit()
+        todo = self.get_todo(todo_id)
+        if todo is None:
+            raise RuntimeError("Created todo could not be read back from SQLite")
+        return todo
+
+    def get_todo(self, todo_id: str) -> Optional[Dict[str, object]]:
+        row = self._connection.execute(
+            "SELECT * FROM todos WHERE id = ?",
+            (todo_id,),
+        ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_pending_todos(self) -> List[Dict[str, object]]:
+        now = self._format_datetime(datetime.now())
+        rows = self._connection.execute(
+            """
+            SELECT * FROM todos
+            WHERE due_at IS NOT NULL
+              AND due_at > ?
+              AND completed_at IS NULL
+              AND notified_at IS NULL
+            ORDER BY due_at ASC
+            """,
+            (now,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_todos_due_soon(self, minutes_ahead: int = 60) -> List[Dict[str, object]]:
+        now = datetime.now()
+        cutoff = now + timedelta(minutes=minutes_ahead)
+        rows = self._connection.execute(
+            """
+            SELECT * FROM todos
+            WHERE due_at IS NOT NULL
+              AND due_at <= ?
+              AND completed_at IS NULL
+              AND notified_at IS NULL
+            ORDER BY due_at ASC
+            """,
+            (self._format_datetime(cutoff),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_todo_notified(self, todo_id: str) -> None:
+        self._connection.execute(
+            "UPDATE todos SET notified_at = ? WHERE id = ?",
+            (self._format_datetime(datetime.now()), todo_id),
+        )
+        self._connection.commit()
+
+    def mark_todo_completed(self, todo_id: str) -> None:
+        self._connection.execute(
+            "UPDATE todos SET completed_at = ? WHERE id = ?",
+            (self._format_datetime(datetime.now()), todo_id),
+        )
+        self._connection.commit()
+
+    def set_nudge_context(self, phone_number: str, habit_id: str) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO nudge_context (phone_number, habit_id, sent_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(phone_number) DO UPDATE SET
+                habit_id = excluded.habit_id,
+                sent_at = excluded.sent_at
+            """,
+            (phone_number, habit_id, self._format_datetime(datetime.now())),
+        )
+        self._connection.commit()
+
+    def get_nudge_context(self, phone_number: str) -> Optional[str]:
+        expires_after = self._format_datetime(datetime.now() - timedelta(hours=24))
+        row = self._connection.execute(
+            """
+            SELECT habit_id FROM nudge_context
+            WHERE phone_number = ? AND sent_at >= ?
+            """,
+            (phone_number, expires_after),
+        ).fetchone()
+        return row["habit_id"] if row else None
+
+    def clear_nudge_context(self, phone_number: str) -> None:
+        self._connection.execute(
+            "DELETE FROM nudge_context WHERE phone_number = ?",
+            (phone_number,),
+        )
+        self._connection.commit()
+
     @staticmethod
     def _row_to_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, object]]:
         if row is None:
@@ -258,3 +444,8 @@ class SQLiteRegistry:
                 data[key] = json.loads(data[key])
         return data
 
+    @staticmethod
+    def _format_datetime(value: Optional[datetime]) -> Optional[str]:
+        if value is None:
+            return None
+        return value.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")

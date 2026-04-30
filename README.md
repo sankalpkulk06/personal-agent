@@ -38,13 +38,13 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Persistent news context** — follow-up questions remember the articles
 - **Proper citations** — news sources cited separately from documents
 
-### **5. Apple Reminders Todos** ✅
-- **Quick todo capture** — `/todo Buy oat milk` adds a reminder from chat
+### **5. Sage Reminders & Todos** ✅
+- **Sage-owned reminders** — `/todo Buy oat milk` stores a reminder in SQLite
+- **Natural language reminders** — "remind me to take the trash out at 8PM today"
+- **Proactive WhatsApp delivery** — `sage serve` schedules and sends due reminders
 - **Natural language due dates** — `/todo Buy milk @tomorrow` or `/todo Call mom @next Tuesday at 3pm`
-- **Custom reminder lists** — `/todo Buy milk #Shopping` to add to specific lists
-- **Flexible date parsing** — supports relative dates, specific dates, and times
-- **Native macOS integration** — uses the built-in Reminders app through AppleScript
-- **Configurable target list** — choose a default list with `REMINDERS_DEFAULT_LIST`
+- **Missed reminder recovery** — a fallback scanner catches reminders missed during restarts
+- **Apple Reminders opt-in** — `/apple-reminder ...` only writes to macOS Reminders when explicitly requested
 
 ### **6. Document Management** 📚
 - **Multi-format support** — `.txt`, `.md`, `.pdf` files
@@ -82,8 +82,15 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Long reply splitting** — responses over 1600 chars automatically split across multiple messages at sentence boundaries
 - **`sage serve` command** — starts a FastAPI webhook server Twilio forwards messages to
 - **ngrok-friendly** — works locally with ngrok for dev; any public HTTPS endpoint for prod
+- **Twilio usage tracking** — `/usage` shows daily CLI chats, WhatsApp chats, and outbound Twilio quota
 
-### **11. Gmail Email Triage** 📧
+### **11. Proactive Briefings & Habit Nudges** ⏰
+- **Morning briefing** — daily WhatsApp summary of habits, news, and due reminders
+- **Habit nudges** — asks about unlogged habits at the configured nudge time
+- **Fast nudge replies** — reply `done` or `skipped` to log a habit without going through the LLM
+- **Scheduler lives in `sage serve`** — proactive behavior runs while the webhook server is up
+
+### **12. Gmail Email Triage** 📧
 - **Fetch personal inbox** — pulls recent primary-tab emails via Gmail API
 - **AI-powered triage** — classifies each email as ACTION, FYI, or IGNORE
 - **Actionable summary** — surfaces what needs a reply or decision
@@ -91,7 +98,7 @@ A **local-first, privacy-respecting personal AI assistant** that combines retrie
 - **Standalone command** — `sage email-personal` for a quick triage outside chat
 - **Filters automatically** — skips promotions, social, updates, and forums
 
-### **12. Configuration & Customization** ⚙️
+### **13. Configuration & Customization** ⚙️
 - **Environment variables** — all settings configurable via `.env`
 - **Custom assistant name** — change who you're talking to
 - **Retrieval depth** — adjust how many documents to retrieve (in-session)
@@ -108,7 +115,7 @@ Sage uses **open source Ollama models with tool calling** — the model understa
 1. **You ask naturally:** "What's the news on Tesla?" or "Remember that I like coffee"
 2. **Model understands intent:** Identifies that it needs to fetch news, search the web, save a fact, etc.
 3. **Automatically calls tools:** Generates JSON with the tool name and parameters
-4. **Tools execute:** Fetches news, searches the web, saves facts, adds todos, searches documents
+4. **Tools execute:** Fetches news, searches the web, saves facts, adds Sage todos, searches documents
 5. **Model responds:** Incorporates tool results into a natural response
 
 **No `/commands` required** — but they still work as shortcuts if you prefer them.
@@ -201,7 +208,9 @@ sage --resume <session-id>  # Shortcut
 | `/email` | Check personal email and triage action items |
 | `/news [query]` | Fetch live news |
 | `/search <query>` | Search the web for current information |
-| `/todo <task> [#list] [@due]` | Add a task to Apple Reminders (with optional list & date/time) |
+| `/usage` | Show today's CLI chats, WhatsApp chats, and Twilio outbound usage |
+| `/todo <task> [#list] [@due]` | Add a Sage reminder stored in SQLite |
+| `/apple-reminder <task> [#list] [@due]` | Add a task to Apple Reminders explicitly |
 | `exit` or `quit` | Exit chat |
 
 ### Usage Examples
@@ -265,31 +274,37 @@ document sources:
 - [1] machine-learning-notes.md
 ```
 
-**Capture a todo in Apple Reminders:**
+**Capture Sage reminders:**
 ```
 you : /todo Buy oat milk
-✓ Added todo to Reminders: Buy oat milk
+✓ Added Sage reminder: Buy oat milk
 
 you : /todo Buy groceries #Shopping
-✓ Added todo to Shopping: Buy groceries
-
-you : /todo Buy organic items #Shopping List
-✓ Added todo to Shopping List: Buy organic items
+✓ Added Sage reminder: Buy groceries
 
 you : /todo Call mom @tomorrow
-✓ Added todo to Reminders: Call mom due Wed, Apr 08 at 12:00AM
+✓ Added Sage reminder: Call mom due Wed, Apr 08 at 12:00AM
 
-you : /todo Pay rent #Bills @next 1st
-✓ Added todo to Bills: Pay rent due Thu, May 01 at 12:00AM
+you : remind me to take the trash out at 8PM today
+✓ Added Sage reminder: take the trash out due Thu, Apr 30 at 08:00PM
+```
 
-you : /todo Email tax documents @April 8th at 3pm #Todo
-✓ Added todo to Todo: Email tax documents due Wed, Apr 08 at 03:00PM
+**Add to Apple Reminders only when explicit:**
+```
+you : /apple-reminder Buy printer paper #Office @tomorrow
+✓ Added Apple Reminder to Office: Buy printer paper due Fri, May 01 at 12:00AM
 
-you : /todo Meeting #Work @next Tuesday at 3pm
-✓ Added todo to Work: Meeting due Tue, Apr 15 at 03:00PM
+you : add renew passport to Apple Reminders for next Tuesday at 3pm
+✓ Added to Apple Reminders Reminders: renew passport due Tue, May 05 at 03:00PM
+```
 
-you : /todo Planning #Work Projects @next Friday at 10am
-✓ Added todo to Work Projects: Planning due Fri, Apr 11 at 10:00AM
+**Check usage:**
+```
+you : /usage
+Usage today
+CLI chats: 3
+WhatsApp chats: 7
+Twilio WhatsApp outbound before this reply: 12/50 messages used, 38 remaining.
 ```
 
 **Search the web:**
@@ -452,42 +467,46 @@ sage email-personal --no-triage
 sage email-personal --max-results 10
 ```
 
-### Todo with Natural Language Dates and Custom Lists
+### Sage Reminders, Apple Reminders, and Usage
 
-In chat mode, use `/todo` to add tasks to Apple Reminders with optional due dates and custom lists:
+In chat mode, use `/todo` to add Sage-owned reminders to SQLite. These reminders are sent over WhatsApp by `sage serve` when due. Apple Reminders is explicit opt-in via `/apple-reminder`.
 
 ```bash
-# Basic task
+# Basic Sage reminder
 /todo Buy milk
 
-# Add to specific Reminders list
+# Optional Sage list/category label
 /todo Buy groceries #Shopping
 /todo Pay utilities #Bills
 /todo Review PR #Work
-
-# Lists with spaces in names
-/todo Buy organic items #Shopping List
-/todo Pay rent #Bills and Expenses
-/todo Sprint planning #Work Projects
 
 # Add with due date
 /todo Call mom @tomorrow
 /todo Meeting @next Tuesday at 3pm
 /todo Workout @3pm
 
+# Natural language reminder
+remind me to take the trash out at 8PM today
+remind me to call mom tomorrow morning
+
 # Combine list and due date
 /todo Dinner prep #Personal @6pm
 /todo Project deadline #Work @next Friday
 /todo Anniversary #Important Dates @April 15
+
+# Explicit Apple Reminders
+/apple-reminder Buy printer paper #Office @tomorrow
 ```
 
-**List syntax:** Use `#ListName` to specify which Reminders list to add to. List names can include spaces (e.g., `#Shopping List`, `#Bills and Expenses`). If omitted, uses `REMINDERS_DEFAULT_LIST` (default: "Reminders").
+**List syntax:** Use `#ListName` to attach a list/category label. For `/todo`, this is stored in Sage's SQLite todo table. For `/apple-reminder`, this chooses the Apple Reminders list.
 
 **Date patterns:**
 - **Relative:** today, tomorrow, tonight, next Monday, next week, etc.
 - **Specific dates:** April 15, 2026-04-20, April 15 at 9am
 - **Times:** 3pm, 9:30am, 14:45, etc.
 - **Combinations:** next Tuesday at 3pm, April 20 at 6:30pm
+
+**Usage tracking:** `/usage` reports daily CLI chats, WhatsApp chats, and outbound Twilio WhatsApp messages. The Twilio count is outbound-only because inbound WhatsApp webhooks are tracked separately as chat activity.
 
 ---
 
@@ -516,6 +535,7 @@ Requires a free [Twilio](https://twilio.com) account and [ngrok](https://ngrok.c
    TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+   TWILIO_DAILY_MESSAGE_LIMIT=50
    ```
 
 3. **Join the sandbox** — from WhatsApp, send `join <sandbox-name>` (shown on the Twilio page) to `+1 415 523 8886`.
@@ -536,6 +556,26 @@ Requires a free [Twilio](https://twilio.com) account and [ngrok](https://ngrok.c
 
 6. **Send a message** from WhatsApp to the sandbox number — Sage replies.
 
+### Proactive Scheduler Setup
+
+Proactive reminders, habit nudges, and morning briefings run inside `sage serve`. Keep that process running for scheduled WhatsApp messages.
+
+Add these to `.env`:
+
+```env
+SCHEDULER_ENABLED=true
+MORNING_BRIEFING_TIME=08:00
+HABIT_NUDGE_TIME=21:00
+YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234
+```
+
+Scheduler behavior:
+- One-time Sage reminders use APScheduler `date` jobs.
+- Pending future reminders are reloaded from SQLite on startup.
+- A one-minute fallback scanner catches reminders missed during downtime.
+- If Twilio rejects a send, Sage logs the failure and does not mark the reminder as notified.
+- Usage alerts are sent once per day when outbound Twilio usage reaches 25, 45, and 49 messages. The 49-message alert consumes one message and effectively brings Twilio usage to 50/50.
+
 ---
 
 ## ⚙️ Configuration
@@ -547,7 +587,6 @@ Requires a free [Twilio](https://twilio.com) account and [ngrok](https://ngrok.c
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_CHAT_MODEL=llama3.2:3b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-REMINDERS_DEFAULT_LIST=Reminders
 
 # Chunking
 CHUNK_SIZE=800
@@ -567,8 +606,18 @@ WEB_SEARCH_PROVIDER=tavily  # "tavily" | "duckduckgo"
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+TWILIO_DAILY_MESSAGE_LIMIT=50
 WEBHOOK_PORT=8000
 WHATSAPP_ENABLED=true
+
+# Apple Reminders (explicit opt-in only)
+REMINDERS_DEFAULT_LIST=Reminders
+
+# Scheduler / Proactive Reminders
+SCHEDULER_ENABLED=true
+MORNING_BRIEFING_TIME=08:00
+HABIT_NUDGE_TIME=21:00
+YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234
 
 # Personality
 ASSISTANT_NAME=Sage
@@ -620,7 +669,8 @@ Pattern Detection
 Tool-Calling Loop (LLM decides)
     ├─ web_search  → live web results (🌐)
     ├─ fetch_news  → live news articles (📰)
-    ├─ add_todo    → Apple Reminders
+    ├─ add_todo    → Sage SQLite reminders
+    ├─ add_apple_reminder → Apple Reminders (explicit only)
     ├─ remember_fact / list_facts → personal memory
     └─ search_documents → RAG retrieval (📄)
     ↓
@@ -709,18 +759,19 @@ you : Tell me about payment systems in the book
 | **FactService** | Stores and retrieves learned facts |
 | **NewsService** | Fetches live news from Google News RSS |
 | **EmailService** | Gmail fetch and AI triage |
-| **TodoService** | Adds tasks to macOS Reminders app |
+| **Scheduler** | APScheduler jobs for Sage reminders, habit nudges, and briefings |
+| **RemindersService** | Explicit Apple Reminders integration |
 | **Webhook Server** | FastAPI server receiving Twilio webhooks |
 | **Retriever** | RAG retrieval with embeddings |
 | **OllamaChatProvider** | LLM interface to Ollama |
-| **SQLiteRegistry** | Persists sessions, facts, WhatsApp sessions |
+| **SQLiteRegistry** | Persists sessions, facts, reminders, WhatsApp sessions, and usage |
 | **ChromaStore** | Vector database for embeddings |
 
 ### Data Storage
 
 ```
 data/
-├── sqlite/registry.db         # Sessions, facts, metadata
+├── sqlite/registry.db         # Sessions, facts, reminders, usage, metadata
 ├── chroma/                    # Vector embeddings
 ├── cache/                     # Temporary files
 └── credentials/               # OAuth tokens (Gmail)
@@ -822,8 +873,20 @@ TAVILY_API_KEY=             # Get a free key at app.tavily.com (1,000 req/month)
 WEB_SEARCH_MAX_RESULTS=5    # Max results per search
 WEB_SEARCH_PROVIDER=tavily  # "tavily" | "duckduckgo" (fallback if key absent)
 
-# Reminders (macOS)
-REMINDERS_DEFAULT_LIST=Reminders  # Default Reminders list for /todo
+# Apple Reminders (explicit opt-in only)
+REMINDERS_DEFAULT_LIST=Reminders  # Default list for /apple-reminder
+
+# WhatsApp / Scheduler
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+TWILIO_DAILY_MESSAGE_LIMIT=50
+WEBHOOK_PORT=8000
+WHATSAPP_ENABLED=true
+SCHEDULER_ENABLED=true
+MORNING_BRIEFING_TIME=08:00
+HABIT_NUDGE_TIME=21:00
+YOUR_WHATSAPP_NUMBER=whatsapp:+14155551234
 
 # Personality
 ASSISTANT_NAME=Sage        # Your assistant's name
@@ -846,6 +909,10 @@ DATA_DIR=./data             # Where to store data
 - [x] Conversation context
 - [x] Source citations
 - [x] Apple Reminders integration
+- [x] Sage-owned reminders with WhatsApp scheduling
+- [x] Habit tracker with streaks and reminders
+- [x] Proactive morning briefings via WhatsApp
+- [x] WhatsApp/CLI usage tracking
 - [x] Conversation analytics dashboard
 - [x] Gmail email triage (personal inbox)
 - [x] Web search (Tavily + DuckDuckGo fallback)
@@ -853,8 +920,6 @@ DATA_DIR=./data             # Where to store data
 
 ### 🚀 Upcoming
 - [ ] Voice notes over WhatsApp (Whisper transcription)
-- [ ] Habit tracker with streaks and reminders
-- [ ] Proactive morning briefings via WhatsApp
 - [ ] Fact verification against documents
 - [ ] Automatic fact extraction from responses
 - [ ] Semantic fact linking & inference

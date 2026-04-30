@@ -3,7 +3,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -13,6 +13,8 @@ from app.services.news_service import NewsService
 from app.services.reminders_service import RemindersService
 from app.services.web_search_service import WebSearchService
 from app.retrieval.retriever import Retriever
+from app.storage.sqlite_registry import SQLiteRegistry
+from app.core.todo_parser import parse_due_date
 
 
 class ToolParameter(BaseModel):
@@ -173,12 +175,20 @@ class ListFactsTool(Tool):
 
 
 class AddTodoTool(Tool):
-    """Add a task to Apple Reminders."""
+    """Add a Sage-owned todo/reminder to SQLite."""
 
-    def __init__(self, reminders_service: RemindersService):
+    def __init__(
+        self,
+        registry: SQLiteRegistry,
+        schedule_todo_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ):
         super().__init__(
             name="add_todo",
-            description="Add a task to Apple Reminders with optional due date and list.",
+            description=(
+                "Create a Sage-owned todo/reminder. Use this for requests like "
+                "'remind me to take out the trash at 7pm today' unless the user "
+                "explicitly asks for Apple Reminders."
+            ),
             parameters=[
                 ToolParameter(
                     name="task",
@@ -200,29 +210,68 @@ class AddTodoTool(Tool):
                 ),
             ],
         )
-        self.reminders_service = reminders_service
+        self.registry = registry
+        self.schedule_todo_callback = schedule_todo_callback
 
     def execute(self, task: str = "", list_name: Optional[str] = None, due_date: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         try:
             if not task:
                 return {"success": False, "error": "Task cannot be empty"}
 
-            # Parse due_date if provided
-            parsed_due_date = None
-            if due_date:
-                try:
-                    from dateutil import parser as date_parser
-                    parsed_due_date = date_parser.parse(due_date, fuzzy=True)
-                except Exception:
-                    pass
+            parsed_due_date = parse_due_date(due_date)
+            todo = self.registry.create_todo(
+                title=task,
+                list_name=list_name,
+                due_at=parsed_due_date,
+            )
+            if parsed_due_date and self.schedule_todo_callback:
+                self.schedule_todo_callback(todo)
+            due_str = f" due {parsed_due_date.strftime('%a, %b %d at %I:%M%p')}" if parsed_due_date else ""
+            return {"success": True, "result": f"✓ Added Sage reminder: {task}{due_str}"}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to add todo: {str(e)}"}
 
+
+class AddAppleReminderTool(Tool):
+    """Add a task to Apple Reminders only when explicitly requested."""
+
+    def __init__(self, reminders_service: RemindersService):
+        super().__init__(
+            name="add_apple_reminder",
+            description=(
+                "Add a task to native Apple Reminders. Use only when the user explicitly "
+                "says Apple Reminders or asks to add it to Apple Reminders."
+            ),
+            parameters=[
+                ToolParameter(name="task", type="string", description="The task to add", required=True),
+                ToolParameter(
+                    name="list_name",
+                    type="string",
+                    description="Which Apple Reminders list to add to",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="due_date",
+                    type="string",
+                    description="Due date in natural language",
+                    required=False,
+                ),
+            ],
+        )
+        self.reminders_service = reminders_service
+
+    def execute(self, task: str = "", list_name: Optional[str] = None, due_date: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        try:
+            if not task:
+                return {"success": False, "error": "Task cannot be empty"}
+            parsed_due_date = parse_due_date(due_date)
             target_list = self.reminders_service.add_reminder(
                 task=task, list_name=list_name, due_date=parsed_due_date
             )
             due_str = f" due {parsed_due_date.strftime('%a, %b %d at %I:%M%p')}" if parsed_due_date else ""
-            return {"success": True, "result": f"✓ Added to {target_list}: {task}{due_str}"}
+            return {"success": True, "result": f"✓ Added to Apple Reminders {target_list}: {task}{due_str}"}
         except Exception as e:
-            return {"success": False, "error": f"Failed to add todo: {str(e)}"}
+            return {"success": False, "error": f"Failed to add Apple Reminder: {str(e)}"}
 
 
 class SearchDocumentsTool(Tool):
@@ -419,7 +468,9 @@ class ToolRegistry:
         self,
         news_service: Optional[NewsService] = None,
         fact_service: Optional[FactService] = None,
+        registry: Optional[SQLiteRegistry] = None,
         reminders_service: Optional[RemindersService] = None,
+        schedule_todo_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         retriever: Optional[Retriever] = None,
         web_search_service: Optional[WebSearchService] = None,
         habit_service: Optional[HabitService] = None,
@@ -431,8 +482,10 @@ class ToolRegistry:
         if fact_service:
             self.register(RememberFactTool(fact_service))
             self.register(ListFactsTool(fact_service))
+        if registry:
+            self.register(AddTodoTool(registry, schedule_todo_callback=schedule_todo_callback))
         if reminders_service:
-            self.register(AddTodoTool(reminders_service))
+            self.register(AddAppleReminderTool(reminders_service))
         if retriever:
             self.register(SearchDocumentsTool(retriever))
         if web_search_service:

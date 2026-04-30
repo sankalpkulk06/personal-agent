@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import typer
 from rich.console import Console
@@ -75,7 +75,9 @@ def create_analytics_service() -> AnalyticsService:
     return AnalyticsService(registry=registry)
 
 
-def create_chat_service() -> ChatService:
+def create_chat_service(
+    schedule_todo_callback: Optional[Callable[[dict[str, Any]], None]] = None,
+) -> ChatService:
     settings = get_settings()
     paths = settings.resolve_paths()
     retriever = Retriever(
@@ -106,6 +108,8 @@ def create_chat_service() -> ChatService:
         reminders_service=reminders_service,
         web_search_service=web_search_service,
         habit_service=habit_service,
+        schedule_todo_callback=schedule_todo_callback,
+        twilio_daily_message_limit=settings.twilio_daily_message_limit,
         assistant_name=settings.assistant_name,
         enable_tools=True,
     )
@@ -127,11 +131,11 @@ def ask_command(
         typer.echo(f"Error: ask failed: {exc}")
         raise typer.Exit(code=1)
 
-    console.print("[bold magenta]answer[/bold magenta]")
+    console.print("[bold magenta]Answer:[/bold magenta]")
     console.print(result.answer)
 
     if result.sources:
-        console.print("\n[bold magenta]sources[/bold magenta]")
+        console.print("\n[bold magenta]Sources:[/bold magenta]")
         seen = set()
         for source in result.sources:
             source_label = source.file_name or source.source_path or source.document_id
@@ -140,7 +144,7 @@ def ask_command(
             seen.add(source_label)
             console.print(f"[dim]- {source_label}[/dim]")
     else:
-        console.print("\n[dim]sources: none[/dim]")
+        console.print("\n[dim]No relevant sources found in indexed documents.[/dim]")
 
     if export:
         settings = get_settings()

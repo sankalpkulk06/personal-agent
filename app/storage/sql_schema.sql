@@ -74,6 +74,19 @@ CREATE TABLE IF NOT EXISTS whatsapp_sessions (
     last_active   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS whatsapp_usage_daily (
+    usage_date  TEXT PRIMARY KEY,
+    sent_count  INTEGER NOT NULL DEFAULT 0,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_usage_alerts (
+    usage_date  TEXT NOT NULL,
+    threshold   INTEGER NOT NULL,
+    sent_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (usage_date, threshold)
+);
+
 CREATE TABLE IF NOT EXISTS habits (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL COLLATE NOCASE,
@@ -93,9 +106,27 @@ CREATE TABLE IF NOT EXISTS habit_logs (
 CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_id ON habit_logs(habit_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_logged_at ON habit_logs(logged_at);
 
+CREATE TABLE IF NOT EXISTS todos (
+    id              TEXT PRIMARY KEY,
+    title           TEXT NOT NULL,
+    list_name       TEXT,
+    due_at          DATETIME,
+    completed_at    DATETIME,
+    notified_at     DATETIME,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_todos_due_at ON todos(due_at);
+CREATE INDEX IF NOT EXISTS idx_todos_pending ON todos(completed_at, notified_at, due_at);
+
+CREATE TABLE IF NOT EXISTS nudge_context (
+    phone_number    TEXT PRIMARY KEY,
+    habit_id        TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+    sent_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS named_sessions (
     name       TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-

@@ -20,3 +20,4 @@ google-api-python-client
 tavily-python
 ddgs
 twilio>=9.0
+apscheduler

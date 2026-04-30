@@ -133,6 +133,8 @@ def build_system_message_with_tools(
         "- Output ONLY valid JSON like: {\"tool\": \"tool_name\", \"parameters\": {\"key\": \"value\"}}\n"
         "- Always use the exact tool name and parameters from the definitions below\n"
         "- For natural language dates/times, describe them as the user said (e.g., 'tomorrow', 'next Tuesday')\n\n"
+        "- Use add_todo for normal reminders/todos, including 'remind me...' requests\n"
+        "- Use add_apple_reminder only when the user explicitly says Apple Reminders\n\n"
     )
 
     if learned_facts:

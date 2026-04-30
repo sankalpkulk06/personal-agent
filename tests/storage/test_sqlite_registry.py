@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from app.schemas.chunk import DocumentChunk
 from app.schemas.document import ParsedDocument
@@ -39,10 +40,122 @@ def test_sqlite_registry_initializes_schema(tmp_path):
     registry = SQLiteRegistry(db_path=db_path)
     try:
         document_tables = registry._connection.execute(  # noqa: SLF001
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents', 'chunks')"
+            """
+            SELECT name FROM sqlite_master
+            WHERE type='table'
+              AND name IN (
+                'documents',
+                'chunks',
+                'todos',
+                'nudge_context',
+                'whatsapp_usage_daily',
+                'whatsapp_usage_alerts'
+              )
+            """
         ).fetchall()
         table_names = sorted([row["name"] for row in document_tables])
-        assert table_names == ["chunks", "documents"]
+        assert table_names == [
+            "chunks",
+            "documents",
+            "nudge_context",
+            "todos",
+            "whatsapp_usage_alerts",
+            "whatsapp_usage_daily",
+        ]
+    finally:
+        registry.close()
+
+
+def test_todo_queries_exclude_completed_and_notified(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        due = datetime.now() + timedelta(minutes=30)
+        overdue = datetime.now() - timedelta(minutes=5)
+        future = datetime.now() + timedelta(hours=2)
+
+        due_todo = registry.create_todo("Pay bill", due_at=due)
+        notified = registry.create_todo("Already nudged", due_at=overdue)
+        completed = registry.create_todo("Already done", due_at=overdue)
+        future_todo = registry.create_todo("Later", due_at=future)
+        registry.create_todo("No due date")
+
+        registry.mark_todo_notified(notified["id"])
+        registry.mark_todo_completed(completed["id"])
+
+        due_soon = registry.get_todos_due_soon(minutes_ahead=60)
+        pending = registry.get_pending_todos()
+
+        assert [todo["id"] for todo in due_soon] == [due_todo["id"]]
+        assert {todo["id"] for todo in pending} == {due_todo["id"], future_todo["id"]}
+    finally:
+        registry.close()
+
+
+def test_nudge_context_persists_and_expires(tmp_path):
+    db_path = tmp_path / "registry.db"
+    registry = SQLiteRegistry(db_path=db_path)
+    try:
+        habit = registry._connection.execute(  # noqa: SLF001
+            "INSERT INTO habits (id, name) VALUES (?, ?) RETURNING id",
+            ("habit-1", "gym"),
+        ).fetchone()
+        registry.set_nudge_context("whatsapp:+1", habit["id"])
+        assert registry.get_nudge_context("whatsapp:+1") == "habit-1"
+    finally:
+        registry.close()
+
+    registry = SQLiteRegistry(db_path=db_path)
+    try:
+        assert registry.get_nudge_context("whatsapp:+1") == "habit-1"
+        registry._connection.execute(  # noqa: SLF001
+            "UPDATE nudge_context SET sent_at = ? WHERE phone_number = ?",
+            ((datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"), "whatsapp:+1"),
+        )
+        registry._connection.commit()  # noqa: SLF001
+        assert registry.get_nudge_context("whatsapp:+1") is None
+    finally:
+        registry.close()
+
+
+def test_whatsapp_usage_tracks_count_and_alert_flags(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        assert registry.get_whatsapp_usage_today(daily_limit=50)["sent_count"] == 0
+
+        assert registry.record_whatsapp_message_sent() == 1
+        assert registry.record_whatsapp_message_sent() == 2
+
+        usage = registry.get_whatsapp_usage_today(daily_limit=50)
+        assert usage["sent_count"] == 2
+        assert usage["remaining"] == 48
+
+        assert registry.has_whatsapp_usage_alert_sent(25) is False
+        registry.mark_whatsapp_usage_alert_sent(25)
+        assert registry.has_whatsapp_usage_alert_sent(25) is True
+    finally:
+        registry.close()
+
+
+def test_chat_usage_counts_cli_and_whatsapp_user_turns(tmp_path):
+    registry = SQLiteRegistry(db_path=tmp_path / "registry.db")
+    try:
+        cli_session = registry.get_or_create_named_session("cli:default")
+        whatsapp_session = registry.get_or_create_whatsapp_session("whatsapp:+1")
+        other_session = "other-session"
+        registry.create_session(other_session)
+
+        registry.append_turn(cli_session, "cli-user-1", "user", "hello", 0)
+        registry.append_turn(cli_session, "cli-assistant-1", "assistant", "hi", 1)
+        registry.append_turn(whatsapp_session, "wa-user-1", "user", "hello", 0)
+        registry.append_turn(whatsapp_session, "wa-user-2", "user", "again", 1)
+        registry.append_turn(other_session, "other-user-1", "user", "other", 0)
+
+        usage = registry.get_chat_usage_today()
+
+        assert usage["cli"] == 1
+        assert usage["whatsapp"] == 2
+        assert usage["other"] == 1
+        assert usage["total"] == 4
     finally:
         registry.close()
 
@@ -111,4 +224,3 @@ def test_sqlite_registry_repeated_upsert_updates_values(tmp_path):
         assert stored_chunk["char_end"] == len("Hello updated")
     finally:
         registry.close()
-
