@@ -159,9 +159,15 @@ class ChatService:
         # Build messages with tool-aware system prompt
         if self._enable_tools:
             tool_schemas = self._tool_registry.to_schemas()
+            learned_facts_list = []
+            if self._fact_service:
+                personal = self._fact_service.get_relevant_facts("personal", limit=5)
+                work = self._fact_service.get_relevant_facts("work", limit=5)
+                learned_facts_list = [{"content": f.content} for f in (personal + work)]
             system_message = build_system_message_with_tools(
                 assistant_name=self._assistant_name,
                 tools_schemas=tool_schemas,
+                learned_facts=learned_facts_list if learned_facts_list else None,
             )
         else:
             system_message = (

@@ -344,6 +344,74 @@ class LogHabitTool(Tool):
             return {"success": False, "error": f"Failed to log habit: {str(e)}"}
 
 
+class GetHabitsTool(Tool):
+    """Get the weekly habit summary."""
+
+    def __init__(self, habit_service: HabitService):
+        super().__init__(
+            name="get_habits",
+            description=(
+                "Get the user's tracked habits and their weekly progress summary. "
+                "Use this when the user asks about their habits, streaks, or habit status."
+            ),
+            parameters=[],
+        )
+        self.habit_service = habit_service
+
+    def execute(self, **kwargs) -> Dict[str, Any]:
+        try:
+            from datetime import date
+            summaries = self.habit_service.get_weekly_summary()
+            if not summaries:
+                return {"success": True, "result": "No habits tracked yet. You can add one by telling me a habit you want to track."}
+            today = date.today()
+            week_label = today.strftime("Week of %b %-d, %Y")
+            lines = [f"Habit summary — {week_label}:\n"]
+            for s in summaries:
+                streak_txt = f"🔥 {s.streak}-day streak" if s.streak > 0 else "streak broken"
+                today_txt = "✓ logged today" if s.logged_today else "not logged today"
+                lines.append(f"• {s.habit.name}: {s.days_done}/7 days this week | {streak_txt} | {today_txt}")
+            return {"success": True, "result": "\n".join(lines)}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to get habits: {str(e)}"}
+
+
+class AddHabitTool(Tool):
+    """Add a new habit to track."""
+
+    def __init__(self, habit_service: HabitService):
+        super().__init__(
+            name="add_habit",
+            description=(
+                "Start tracking a new habit. Use this when the user wants to add or create a habit to track."
+            ),
+            parameters=[
+                ToolParameter(
+                    name="name",
+                    type="string",
+                    description="The name of the habit to track (e.g. 'gym', 'reading', 'meditation')",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="reminder_time",
+                    type="string",
+                    description="Daily reminder time in 24h or 12h format (e.g. '21:00', '9pm'). Defaults to 21:00.",
+                    required=False,
+                ),
+            ],
+        )
+        self.habit_service = habit_service
+
+    def execute(self, name: str = "", reminder_time: str = "21:00", **kwargs) -> Dict[str, Any]:
+        try:
+            if not name:
+                return {"success": False, "error": "Habit name cannot be empty"}
+            habit = self.habit_service.add_habit(name=name, reminder_time=reminder_time)
+            return {"success": True, "result": f"✓ Now tracking habit '{habit.name}' (reminder at {habit.reminder_time})"}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to add habit: {str(e)}"}
+
+
 class ToolRegistry:
     """Registry of all available tools."""
 
@@ -370,6 +438,8 @@ class ToolRegistry:
         if web_search_service:
             self.register(WebSearchTool(web_search_service))
         if habit_service:
+            self.register(GetHabitsTool(habit_service))
+            self.register(AddHabitTool(habit_service))
             self.register(LogHabitTool(habit_service))
 
     def register(self, tool: Tool) -> None:

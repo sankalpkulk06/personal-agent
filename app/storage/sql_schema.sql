@@ -93,3 +93,9 @@ CREATE TABLE IF NOT EXISTS habit_logs (
 CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_id ON habit_logs(habit_id);
 CREATE INDEX IF NOT EXISTS idx_habit_logs_logged_at ON habit_logs(logged_at);
 
+CREATE TABLE IF NOT EXISTS named_sessions (
+    name       TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+

@@ -336,8 +336,7 @@ def chat_command(top_k: Optional[int] = None, session_id: Optional[str] = None) 
     session_top_k = top_k
 
     if session_id is None:
-        session_id = str(uuid.uuid4())
-        service.create_session(session_id=session_id)
+        session_id = service.get_registry().get_or_create_named_session("cli:default")
     else:
         service.create_session(session_id=session_id)
 
