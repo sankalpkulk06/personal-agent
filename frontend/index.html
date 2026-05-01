@@ -2451,17 +2451,6 @@
     try {
       const data = await apiFetch('POST', `/sessions/${currentSessionId}/chat`, { message: v });
 
-      // Auto-title the session on first message
-      const titleEl = document.getElementById('sessionTitle');
-      const currentTitle = titleEl?.textContent?.trim() || '';
-      if (!currentTitle || currentTitle === 'New chat' || currentTitle === 'Untitled') {
-        const autoTitle = v.slice(0, 60);
-        if (titleEl) titleEl.textContent = autoTitle;
-        const sideTitle = document.querySelector(`.session-item[data-id="${currentSessionId}"] .title`);
-        if (sideTitle) sideTitle.textContent = autoTitle;
-        apiFetch('PATCH', `/sessions/${currentSessionId}`, { title: autoTitle }).catch(() => {});
-      }
-
       const srcCount = data.sources?.length || 0;
       const srcLabel = srcCount ? `· ${srcCount} source${srcCount > 1 ? 's' : ''}` : '';
 
@@ -2477,6 +2466,18 @@
           </div>
         </div>`;
       typingEl.replaceWith(replyEl);
+
+      // Background title generation — fire and forget, update UI when resolved
+      const sessionIdForTitle = currentSessionId;
+      apiFetch('POST', `/sessions/${sessionIdForTitle}/generate-title`)
+        .then(({ title }) => {
+          if (!title || sessionIdForTitle !== currentSessionId) return;
+          const titleEl = document.getElementById('sessionTitle');
+          if (titleEl) titleEl.textContent = title;
+          const sideTitle = document.querySelector(`.session-item[data-id="${sessionIdForTitle}"] .title`);
+          if (sideTitle) sideTitle.textContent = title;
+        })
+        .catch(() => {}); // silently swallow — title generation is best-effort
     } catch (err) {
       const errEl = document.createElement('div');
       errEl.className = 'msg msg-sage';

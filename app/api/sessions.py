@@ -146,6 +146,16 @@ async def update_session_title(
     )
 
 
+@router.post("/{session_id}/generate-title")
+async def generate_title(
+    session_id: str,
+    chat_service: ChatService = Depends(get_chat_service),
+) -> dict:
+    """Ask the LLM to summarise the session in ≤5 words and persist the result."""
+    title = chat_service.generate_session_title(session_id)
+    return {"title": title}
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_200_OK)
 async def delete_session(
     session_id: str,

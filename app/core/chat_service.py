@@ -856,6 +856,36 @@ class ChatService:
         """
         self._registry.create_session(session_id=session_id, title=title)
 
+    def generate_session_title(self, session_id: str) -> str:
+        """Ask the LLM to summarise the session in ≤5 words, persist, and return it."""
+        turns = self._registry.get_session_turns(session_id)
+        if not turns:
+            return ""
+
+        # Build a compact transcript (first 6 turns max to keep the prompt tiny)
+        lines = []
+        for t in turns[:6]:
+            role = "User" if t["role"] == "user" else "Sage"
+            lines.append(f"{role}: {t['content'][:200]}")
+        transcript = "\n".join(lines)
+
+        prompt = (
+            "Generate a short title for this conversation. "
+            "The title must be 5 words or fewer, sentence case, no punctuation, no quotes.\n\n"
+            f"{transcript}\n\nTitle:"
+        )
+        try:
+            raw = self._chat_provider.generate(prompt)
+            title = raw.strip().strip('"\'').strip()
+            # Hard-cap at 60 chars in case the model misbehaves
+            title = title[:60]
+        except Exception:
+            return ""
+
+        if title:
+            self._registry.update_session_title(session_id=session_id, title=title)
+        return title
+
     def list_sessions(self, limit: int = 20) -> List[dict]:
         """List recent chat sessions.
 
