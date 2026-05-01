@@ -146,6 +146,16 @@ async def update_session_title(
     )
 
 
+@router.delete("/{session_id}", status_code=status.HTTP_200_OK)
+async def delete_session(
+    session_id: str,
+    registry: SQLiteRegistry = Depends(get_registry),
+) -> dict:
+    """Delete a session and all its messages."""
+    registry.delete_session(session_id=session_id)
+    return {"ok": True}
+
+
 @router.post("/{session_id}/chat", response_model=ChatResponse)
 async def chat(
     session_id: str,

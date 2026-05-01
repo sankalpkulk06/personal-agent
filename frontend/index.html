@@ -371,6 +371,18 @@
   }
   .session-item:hover { background: var(--bg-2); }
   .session-item.active { background: var(--bg-3); }
+  .session-item .del-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px;
+    display: none; place-items: center;
+    border-radius: 4px;
+    color: var(--text-4);
+    transition: background 120ms, color 120ms;
+    flex-shrink: 0;
+  }
+  .session-item .del-btn svg { width: 12px; height: 12px; }
+  .session-item:hover .del-btn { display: grid; }
+  .session-item .del-btn:hover { background: rgba(210,117,117,0.15); color: var(--err); }
   .session-item.active::before {
     content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px;
     background: var(--accent); border-radius: 0 2px 2px 0;
@@ -2257,6 +2269,11 @@
       <div class="session-item${i === 0 ? ' active' : ''}" data-id="${escapeHtml(s.id)}">
         <div class="title">${escapeHtml(s.title || 'Untitled')}</div>
         <div class="meta">${escapeHtml(formatRelative(s.updated_at))}</div>
+        <button class="del-btn" title="Delete session" aria-label="Delete session">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M3 4h10M6 4V3h4v1M5 4v8h6V4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     `).join('');
     bindSessionItems();
@@ -2264,11 +2281,45 @@
 
   function bindSessionItems() {
     document.querySelectorAll('.session-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.del-btn')) return; // handled separately
         const id = item.dataset.id;
         const title = item.querySelector('.title')?.textContent || '';
         switchSession(id, title);
         if (window.innerWidth <= 900) document.body.dataset.sidebar = 'closed';
+      });
+
+      item.querySelector('.del-btn')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = item.dataset.id;
+        // Animate out
+        item.style.transition = 'opacity 180ms ease, max-height 200ms ease, padding 200ms ease';
+        item.style.maxHeight = item.offsetHeight + 'px';
+        requestAnimationFrame(() => {
+          item.style.opacity = '0';
+          item.style.maxHeight = '0';
+          item.style.padding = '0 10px';
+          item.style.overflow = 'hidden';
+        });
+        setTimeout(() => item.remove(), 210);
+
+        try {
+          await apiFetch('DELETE', `/sessions/${id}`);
+        } catch (e) {
+          console.error('delete failed', e);
+        }
+
+        // If we deleted the active session, switch to the next available one
+        if (id === currentSessionId) {
+          const next = document.querySelector('.session-item');
+          if (next) {
+            const nextId = next.dataset.id;
+            const nextTitle = next.querySelector('.title')?.textContent || '';
+            await switchSession(nextId, nextTitle);
+          } else {
+            await createAndSwitchSession();
+          }
+        }
       });
     });
   }
@@ -2292,7 +2343,12 @@
     const item = document.createElement('div');
     item.className = 'session-item active';
     item.dataset.id = session.id;
-    item.innerHTML = `<div class="title">New chat</div><div class="meta">just now</div>`;
+    item.innerHTML = `<div class="title">New chat</div><div class="meta">just now</div>
+      <button class="del-btn" title="Delete session" aria-label="Delete session">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 4h10M6 4V3h4v1M5 4v8h6V4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>`;
     document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
     list?.prepend(item);
     bindSessionItems();

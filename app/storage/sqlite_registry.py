@@ -185,6 +185,15 @@ class SQLiteRegistry:
         )
         self._connection.commit()
 
+    def delete_session(self, session_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM chat_turns WHERE session_id = ?", (session_id,)
+        )
+        self._connection.execute(
+            "DELETE FROM chat_sessions WHERE session_id = ?", (session_id,)
+        )
+        self._connection.commit()
+
     def insert_fact(self, fact_id: str, content: str, category: str, source: str = "user", confidence_score: float = 1.0) -> None:
         self._connection.execute(
             """
