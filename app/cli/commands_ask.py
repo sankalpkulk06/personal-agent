@@ -11,6 +11,7 @@ from app.core.habit_service import HabitService
 from app.core.ingest_coordinator import IngestCoordinator
 from app.core.qa_service import QAService
 from app.ingestion.ingest_service import IngestService
+from app.services.email_service import EmailService
 from app.services.news_service import NewsService
 from app.services.reminders_service import RemindersService
 from app.services.url_ingestion_service import URLIngestionService
@@ -128,6 +129,11 @@ def create_chat_service(
     web_search_service = create_web_search_service()
     habit_service = HabitService(registry)
     url_ingestion_service = create_url_ingestion_service(registry, chat_provider) if settings.url_ingestion_enabled else None
+    # EmailService silently skipped if credentials aren't present yet
+    try:
+        email_service = EmailService(credentials_dir=paths.credentials_dir, account_type="personal")
+    except Exception:
+        email_service = None
     return ChatService(
         retriever=retriever,
         chat_provider=chat_provider,
@@ -138,6 +144,7 @@ def create_chat_service(
         web_search_service=web_search_service,
         habit_service=habit_service,
         url_ingestion_service=url_ingestion_service,
+        email_service=email_service,
         schedule_todo_callback=schedule_todo_callback,
         twilio_daily_message_limit=settings.twilio_daily_message_limit,
         assistant_name=settings.assistant_name,
