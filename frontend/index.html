@@ -2138,6 +2138,8 @@
           .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           .replace(/\*(.+?)\*/g, '<em>$1</em>')
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+          // URLs → clickable links (after HTML escaping so & is already &amp;)
+          .replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;text-underline-offset:2px;word-break:break-all;">$1</a>')
           .replace(/\n/g, '<br>');
         return `<p>${formatted}</p>`;
       })
