@@ -1894,96 +1894,13 @@
         </div>
       </div>
 
-      <!-- Facts -->
+      <!-- Facts — populated by renderFacts() -->
       <div class="section">
         <div class="section-head">
           <h2><span class="glyph">▍</span>Learned facts</h2>
-          <span class="meta">23 stored · auto-injected when relevant</span>
+          <span class="meta">loading…</span>
         </div>
-        <div class="facts-grid">
-          <div class="facts-card">
-            <div class="facts-card-head">
-              <span class="title"><span class="swatch"></span>Personal</span>
-              <span class="count">14 facts</span>
-            </div>
-            <div class="facts-list">
-              <div class="fact">
-                <div class="text">Lives in <strong>Lisbon, Portugal</strong> — moved from Boston in Sep 2025.</div>
-                <div class="meta"><span class="id">f_a91f2</span><span>·</span><span>Feb 14</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Has a sister, <strong>Anya</strong>, who lives in Madrid. They talk every Sunday evening.</div>
-                <div class="meta"><span class="id">f_b30a7</span><span>·</span><span>Feb 19</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Runs on <strong>Tuesdays and Fridays</strong> at 6:30am along Tagus river.</div>
-                <div class="meta"><span class="id">f_c44d1</span><span>·</span><span>Mar 02</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Prefers oat-milk flat whites. <em style="color:var(--text-3)">Never order regular milk.</em></div>
-                <div class="meta"><span class="id">f_d51e9</span><span>·</span><span>Mar 11</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Birthday: <strong>August 23</strong>. Mum's birthday: November 4.</div>
-                <div class="meta"><span class="id">f_e62f3</span><span>·</span><span>Mar 18</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Allergic to <strong>shellfish</strong>. Mention this when discussing restaurants.</div>
-                <div class="meta"><span class="id">f_f73a8</span><span>·</span><span>Apr 03</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Reading list focus: <strong>cognitive science</strong>, <strong>essays</strong>, anything by Olga Tokarczuk.</div>
-                <div class="meta"><span class="id">f_g84b2</span><span>·</span><span>Apr 14</span></div>
-                <button class="forget">forget</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="facts-card">
-            <div class="facts-card-head">
-              <span class="title work"><span class="swatch"></span>Work</span>
-              <span class="count">9 facts</span>
-            </div>
-            <div class="facts-list">
-              <div class="fact">
-                <div class="text">PhD candidate at <strong>IST Lisbon</strong> · advisor: <strong>Dr. Kahn</strong>.</div>
-                <div class="meta"><span class="id">f_h95c4</span><span>·</span><span>Feb 12</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Thesis: <strong>controllable diffusion for protein folding</strong>. Defense Q4 2026.</div>
-                <div class="meta"><span class="id">f_i06d5</span><span>·</span><span>Feb 14</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Standup is <strong>weekdays at 9:30</strong>. Don't schedule things during it.</div>
-                <div class="meta"><span class="id">f_j17e6</span><span>·</span><span>Feb 20</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Reviewing for <strong>NeurIPS 2026</strong> — 5 papers due May 18.</div>
-                <div class="meta"><span class="id">f_k28f7</span><span>·</span><span>Mar 28</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Codes in <strong>Python + PyTorch</strong>. Hates Conda; uses <code style="font-family:var(--mono);background:var(--bg-3);padding:1px 5px;border-radius:3px;color:var(--accent);font-size:0.92em">uv</code>.</div>
-                <div class="meta"><span class="id">f_l39g8</span><span>·</span><span>Apr 02</span></div>
-                <button class="forget">forget</button>
-              </div>
-              <div class="fact">
-                <div class="text">Collaborator <strong>Pieper</strong> is in Zurich (CET = local). Slow async replies are fine.</div>
-                <div class="meta"><span class="id">f_m4ah9</span><span>·</span><span>Apr 16</span></div>
-                <button class="forget">forget</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="facts-grid"></div>
       </div>
 
       <!-- Habits -->
@@ -2026,64 +1943,13 @@
         </div>
       </div>
 
-      <!-- Knowledge base -->
+      <!-- Knowledge base — populated by renderSources() -->
       <div class="section">
         <div class="section-head">
           <h2><span class="glyph">▍</span>Knowledge base</h2>
-          <span class="meta">87 documents · 2,341 chunks · ChromaDB local</span>
+          <span class="meta">loading…</span>
         </div>
-        <div class="source-list">
-          <div class="source">
-            <div class="ico" title="PDF">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9H3V2z" stroke-linejoin="round"/><path d="M10 2v3h3" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="title">Pieper et al. — Score-based diffusion for protein structure
-              <span class="url">~/papers/pieper_2025_diffusion.pdf</span>
-            </div>
-            <span class="chunks">142 chunks</span>
-            <span class="when">Apr 28</span>
-          </div>
-          <div class="source">
-            <div class="ico" title="Web">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2.5 2 9.5 0 12M8 2C6 4.5 6 11.5 8 14"/></svg>
-            </div>
-            <div class="title">Lilian Weng — What are Diffusion Models?
-              <span class="url">lilianweng.github.io/posts/2021-07-11-diffusion-models</span>
-            </div>
-            <span class="chunks">38 chunks</span>
-            <span class="when">Apr 24</span>
-          </div>
-          <div class="source">
-            <div class="ico" title="Markdown">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 10V6l1.5 2L8 6v4M11 6v4M9.5 8.5L11 10l1.5-1.5"/></svg>
-            </div>
-            <div class="title">thesis-notes/chapter-3-controllable-sampling.md
-              <span class="url">~/sage/data/thesis-notes/...</span>
-            </div>
-            <span class="chunks">61 chunks</span>
-            <span class="when">Apr 22</span>
-          </div>
-          <div class="source">
-            <div class="ico" title="PDF">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9H3V2z" stroke-linejoin="round"/><path d="M10 2v3h3" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="title">Karras et al. — Elucidating the Design Space of Diffusion Models
-              <span class="url">~/papers/karras_edm.pdf</span>
-            </div>
-            <span class="chunks">96 chunks</span>
-            <span class="when">Apr 19</span>
-          </div>
-          <div class="source">
-            <div class="ico" title="Web">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2.5 2 9.5 0 12M8 2C6 4.5 6 11.5 8 14"/></svg>
-            </div>
-            <div class="title">arxiv:2310.02391 — Consistency Models in Practice
-              <span class="url">arxiv.org/abs/2310.02391</span>
-            </div>
-            <span class="chunks">22 chunks</span>
-            <span class="when">Apr 11</span>
-          </div>
-        </div>
+        <div class="source-list"></div>
       </div>
 
       <!-- Privacy -->
@@ -2521,7 +2387,7 @@
       document.getElementById('login').hidden = true;
       document.getElementById('profile').scrollTop = 0;
     }, 520);
-    renderProfileWidgets();
+    loadProfile();
   }
   function backToChat() {
     document.getElementById('chat').hidden = false;
@@ -2541,61 +2407,184 @@
     setTimeout(() => { btn.innerHTML = orig; }, 1800);
   });
 
-  function renderProfileWidgets() {
-    const habits = [
-      { name: 'Morning pages',      icon: '✎', week: ['done','done','done','done','done','done','done'], streak: 31 },
-      { name: 'Run',                icon: 'R',  week: ['skip','done','skip','skip','done','skip','skip'], streak: 6  },
-      { name: 'No phone after 10p', icon: '☾', week: ['done','done','skip','done','done','done','done'], streak: 4  },
-      { name: 'Read 20 min',        icon: '⌶', week: ['done','done','done','skip','done','done','future'], streak: 12 },
-    ];
-    const hCard = document.getElementById('habitsCard');
-    if (hCard) {
-      hCard.innerHTML = habits.map(h => `
-        <div class="habit-row">
-          <div class="name"><span class="icon">${h.icon}</span>${escapeHtml(h.name)}</div>
-          <div class="habit-week">${h.week.map(d => `<span class="day ${d}"></span>`).join('')}</div>
-          <div class="habit-streak"><span class="num">${h.streak}</span> day streak</div>
-        </div>
-      `).join('');
+  async function loadProfile() {
+    // Fire all requests in parallel
+    const [profile, facts, habits, analytics, sources] = await Promise.allSettled([
+      apiFetch('GET', '/profile'),
+      apiFetch('GET', '/facts'),
+      apiFetch('GET', '/habits'),
+      apiFetch('GET', '/analytics'),
+      apiFetch('GET', '/sources'),
+    ]);
+
+    if (profile.status === 'fulfilled') renderProfileHero(profile.value);
+    if (facts.status === 'fulfilled')   renderFacts(facts.value);
+    if (habits.status === 'fulfilled')  renderHabits(habits.value);
+    if (analytics.status === 'fulfilled') renderAnalytics(analytics.value);
+    if (sources.status === 'fulfilled') renderSources(sources.value);
+  }
+
+  // ---- Hero + stat row ----
+  function renderProfileHero(p) {
+    // Avatar letter
+    const letter = (p.username || 'U')[0].toUpperCase();
+    document.querySelector('.hero-avatar')?.replaceChildren(document.createTextNode(letter));
+    document.querySelector('.topbar-avatar')?.replaceChildren(document.createTextNode(letter));
+    document.querySelectorAll('.user-chip .avatar').forEach(el => el.textContent = letter);
+
+    // Name
+    const nameEl = document.querySelector('.hero-name');
+    if (nameEl) nameEl.textContent = p.username;
+
+    // Sub-line
+    const subEl = document.querySelector('.hero-sub');
+    if (subEl) {
+      const joined = p.joined ? new Date(p.joined.includes('T') ? p.joined : p.joined.replace(' ','T')+'Z')
+        .toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+      subEl.innerHTML = `
+        <span class="pill"><span class="dot"></span>local user</span>
+        <span>~/sage</span>
+        <span class="sep">·</span>
+        <span>joined ${escapeHtml(joined)}</span>
+        <span class="sep">·</span>
+        <span>${p.days_active} days active</span>`;
     }
 
-    const heat = document.getElementById('heatmap');
-    if (heat) {
-      const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-      function hval(d, h) {
-        let v = 0;
-        if (h >= 9 && h <= 11) v = 3 + ((d + h) % 2);
-        else if (h >= 14 && h <= 16) v = 2;
-        else if (h >= 20 && h <= 22) v = 1 + ((d * h) % 2);
-        else if (h >= 7 && h < 9) v = 1;
-        if (d >= 5) v = Math.max(0, v - 1);
-        if ((d * 7 + h) % 17 === 0) v = Math.min(4, v + 1);
-        return Math.min(4, v);
+    // Summary
+    const sumEl = document.querySelector('.hero-summary');
+    if (sumEl) {
+      const total = p.facts_personal + p.facts_work;
+      sumEl.innerHTML = `<span class="accent">$</span> Sage has learned <strong style="color:var(--text-1);font-weight:500">${total} facts</strong> across 2 categories and tracks <strong style="color:var(--text-1);font-weight:500">${p.longest_streak > 0 ? `${p.longest_streak}-day streak` : 'habits'}</strong>${p.longest_streak_habit ? ` on ${escapeHtml(p.longest_streak_habit)}` : ''}.`;
+    }
+
+    // Stat cards
+    const stats = document.querySelectorAll('.stat');
+    if (stats[0]) {
+      stats[0].querySelector('.value').innerHTML = `${p.total_sessions}<span class="unit">total</span>`;
+      stats[0].querySelector('.delta').textContent = `${p.days_active} days active`;
+    }
+    if (stats[1]) {
+      stats[1].querySelector('.value').innerHTML = `${p.facts_personal + p.facts_work}<span class="unit">stored</span>`;
+      stats[1].querySelector('.delta').textContent = `${p.facts_personal} personal · ${p.facts_work} work`;
+    }
+    if (stats[2]) {
+      stats[2].querySelector('.value').innerHTML = `${p.longest_streak}<span class="unit">days</span>`;
+      stats[2].querySelector('.delta').textContent = p.longest_streak_habit || 'no active streak';
+    }
+    if (stats[3]) {
+      stats[3].querySelector('.value').innerHTML = `${p.total_docs}<span class="unit">docs</span>`;
+      stats[3].querySelector('.delta').textContent = `${p.total_chunks.toLocaleString()} chunks indexed`;
+    }
+
+    // Section meta for facts
+    const factsMeta = document.querySelector('.section-head .meta');
+    if (factsMeta) {
+      const total = p.facts_personal + p.facts_work;
+      factsMeta.textContent = `${total} stored · auto-injected when relevant`;
+    }
+  }
+
+  // ---- Facts grid ----
+  function renderFacts(facts) {
+    const personal = facts.filter(f => f.category === 'personal');
+    const work     = facts.filter(f => f.category === 'work');
+
+    function factCard(items, label, isWork) {
+      const swatchClass = isWork ? 'work' : '';
+      return `
+        <div class="facts-card">
+          <div class="facts-card-head">
+            <span class="title ${swatchClass}"><span class="swatch"></span>${label}</span>
+            <span class="count">${items.length} facts</span>
+          </div>
+          <div class="facts-list">
+            ${items.map(f => `
+              <div class="fact" data-id="${escapeHtml(f.id)}">
+                <div class="text">${escapeHtml(f.content)}</div>
+                <div class="meta">
+                  <span class="id">${escapeHtml(f.id)}</span>
+                  <span>·</span>
+                  <span>${formatShortDate(f.created_at)}</span>
+                </div>
+                <button class="forget">forget</button>
+              </div>`).join('')}
+            ${items.length === 0 ? '<div style="padding:14px 16px;color:var(--text-4);font-size:13px;">No facts yet</div>' : ''}
+          </div>
+        </div>`;
+    }
+
+    const grid = document.querySelector('.facts-grid');
+    if (grid) grid.innerHTML = factCard(personal, 'Personal', false) + factCard(work, 'Work', true);
+
+    // Update section head count
+    document.querySelectorAll('.section-head').forEach(sh => {
+      if (sh.querySelector('h2')?.textContent.includes('Learned facts')) {
+        const m = sh.querySelector('.meta');
+        if (m) m.textContent = `${facts.length} stored · auto-injected when relevant`;
       }
+    });
+  }
+
+  // ---- Habits ----
+  function renderHabits(habits) {
+    const hCard = document.getElementById('habitsCard');
+    if (!hCard) return;
+    if (!habits.length) {
+      hCard.innerHTML = '<div style="padding:20px 18px;color:var(--text-4);font-size:13px;">No habits tracked yet. Type <code>/habit add &lt;name&gt;</code> in chat.</div>';
+      return;
+    }
+    hCard.innerHTML = habits.map(h => `
+      <div class="habit-row">
+        <div class="name">
+          <span class="icon">${escapeHtml(h.name[0].toUpperCase())}</span>
+          ${escapeHtml(h.name)}
+        </div>
+        <div class="habit-week">
+          ${h.week.map(s => `<span class="day ${s === 'done' ? 'done' : s === 'skipped' ? 'skip' : s === 'future' ? 'future' : ''}"></span>`).join('')}
+        </div>
+        <div class="habit-streak"><span class="num">${h.streak}</span> day streak</div>
+      </div>
+    `).join('');
+  }
+
+  // ---- Activity heatmap + topics ----
+  function renderAnalytics(data) {
+    const heatEl = document.getElementById('heatmap');
+    if (heatEl) {
+      const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      const flat = data.heatmap.flat();
+      const maxVal = Math.max(...flat, 1);
+
       let html = '';
       for (let d = 0; d < 7; d++) {
         html += `<span class="day-label">${days[d]}</span>`;
         for (let h = 0; h < 24; h++) {
-          html += `<span class="cell" data-v="${hval(d,h)}" title="${days[d]} · ${String(h).padStart(2,'0')}:00"></span>`;
+          const cnt = data.heatmap[d][h];
+          const v = cnt === 0 ? 0 : Math.ceil((cnt / maxVal) * 4);
+          html += `<span class="cell" data-v="${v}" title="${days[d]} · ${String(h).padStart(2,'0')}:00 · ${cnt} turns"></span>`;
         }
       }
       html += `<div class="heatmap-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>`;
-      heat.innerHTML = html;
+      heatEl.innerHTML = html;
     }
 
-    const topics = [
-      { tag: '#thesis',    label: 'thesis writing & advisor sync', count: 38, pct: 100 },
-      { tag: '#diffusion', label: 'diffusion model research',       count: 31, pct: 82  },
-      { tag: '#email',     label: 'inbox triage',                   count: 22, pct: 58  },
-      { tag: '#travel',    label: 'Lisbon trip planning',           count: 14, pct: 37  },
-      { tag: '#code',      label: 'PyTorch debugging',              count: 11, pct: 29  },
-      { tag: '#reading',   label: 'book notes & ingestion',         count: 8,  pct: 21  },
-    ];
+    // Update "most active" label
+    const actMeta = document.querySelector('.section[data-section="activity"] .meta') ||
+      [...document.querySelectorAll('.section-head .meta')].find(el => el.closest('.section')?.querySelector('h2')?.textContent.includes('Activity'));
+    if (actMeta && data.most_active_hour != null) {
+      const h = data.most_active_hour;
+      actMeta.textContent = `past 14 days · most active ${String(h).padStart(2,'0')}:00–${String(h+1).padStart(2,'0')}:00`;
+    }
+
     const tList = document.getElementById('topicList');
     if (tList) {
-      tList.innerHTML = topics.map(t => `
+      if (!data.topics.length) {
+        tList.innerHTML = '<div style="color:var(--text-4);font-size:13px;">Not enough data yet</div>';
+        return;
+      }
+      tList.innerHTML = data.topics.map(t => `
         <div class="topic">
-          <div class="label"><span class="tag">${escapeHtml(t.tag)}</span>${escapeHtml(t.label)}</div>
+          <div class="label"><span class="tag">#${escapeHtml(t.label)}</span>${escapeHtml(t.label)}</div>
           <div class="count">${t.count}</div>
           <div class="bar"><div class="fill" data-w="${t.pct}%"></div></div>
         </div>
@@ -2606,11 +2595,49 @@
     }
   }
 
-  // Forget fact animation
-  document.addEventListener('click', (e) => {
+  // ---- Sources / Knowledge base ----
+  function renderSources(sources) {
+    const list = document.querySelector('.source-list');
+    if (!list) return;
+
+    const kbMeta = [...document.querySelectorAll('.section-head .meta')]
+      .find(el => el.closest('.section')?.querySelector('h2')?.textContent.includes('Knowledge'));
+    if (kbMeta) {
+      const totalChunks = sources.reduce((s, r) => s + r.chunk_count, 0);
+      kbMeta.textContent = `${sources.length} documents · ${totalChunks.toLocaleString()} chunks · ChromaDB local`;
+    }
+
+    if (!sources.length) {
+      list.innerHTML = '<div style="padding:20px 16px;color:var(--text-4);font-size:13px;">No documents ingested yet. Paste a URL in chat or use <code>sage ingest</code>.</div>';
+      return;
+    }
+
+    const fileIcon = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9H3V2z" stroke-linejoin="round"/><path d="M10 2v3h3" stroke-linejoin="round"/></svg>`;
+    const webIcon  = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2.5 2 9.5 0 12M8 2C6 4.5 6 11.5 8 14"/></svg>`;
+
+    list.innerHTML = sources.map(s => {
+      const isWeb = s.source_type === 'url';
+      const display = isWeb ? (s.source_url || s.title) : s.title;
+      const sub = isWeb ? (s.source_url || '') : (s.source_path || '');
+      return `
+        <div class="source">
+          <div class="ico" title="${isWeb ? 'Web' : 'File'}">${isWeb ? webIcon : fileIcon}</div>
+          <div class="title">${escapeHtml(display)}
+            <span class="url">${escapeHtml(sub)}</span>
+          </div>
+          <span class="chunks">${s.chunk_count} chunks</span>
+          <span class="when">${formatShortDate(s.ingested_at)}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // ---- Forget fact (live DELETE) ----
+  document.addEventListener('click', async (e) => {
     const f = e.target.closest('.fact .forget');
     if (!f) return;
     const fact = f.closest('.fact');
+    const factId = fact.dataset.id;
+
     fact.style.transition = 'opacity 200ms ease, transform 200ms ease, max-height 220ms ease, padding 220ms ease';
     fact.style.maxHeight = fact.offsetHeight + 'px';
     requestAnimationFrame(() => {
@@ -2620,7 +2647,18 @@
       fact.style.padding = '0 16px';
     });
     setTimeout(() => fact.remove(), 240);
+
+    if (factId) {
+      apiFetch('DELETE', `/facts/${factId}`).catch(() => {});
+    }
   });
+
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '—';
+    const str = String(dateStr).trim();
+    const d = new Date(str.includes('T') ? str : str.replace(' ','T') + 'Z');
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
 
   // ================================================================
   // Sidebar mobile open/close
