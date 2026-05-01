@@ -1,9 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Form, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
+from app.api.router import api_router
 from app.cli.commands_ask import create_chat_service, create_news_service
 from app.config import get_settings
 from app.core.habit_service import HabitService
@@ -94,6 +98,8 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Scheduler disabled or missing WhatsApp destination/config")
 
+    app.state.chat_service = _chat_service
+
     try:
         yield
     finally:
@@ -104,6 +110,26 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "null"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router)
+
+_frontend_index = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+
+
+@app.get("/")
+async def serve_frontend() -> FileResponse:
+    """Serve the Sage web UI."""
+    if not _frontend_index.exists():
+        raise HTTPException(status_code=404, detail="Frontend not built")
+    return FileResponse(str(_frontend_index), media_type="text/html")
 
 
 @app.post("/webhook")

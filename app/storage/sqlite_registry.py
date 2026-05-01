@@ -178,6 +178,13 @@ class SQLiteRegistry:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def update_session_title(self, session_id: str, title: str) -> None:
+        self._connection.execute(
+            "UPDATE chat_sessions SET title = ? WHERE session_id = ?",
+            (title, session_id),
+        )
+        self._connection.commit()
+
     def insert_fact(self, fact_id: str, content: str, category: str, source: str = "user", confidence_score: float = 1.0) -> None:
         self._connection.execute(
             """
