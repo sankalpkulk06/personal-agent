@@ -113,7 +113,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "null"],
+    allow_origins=["*"],   # local network — tighten if exposed beyond LAN
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
