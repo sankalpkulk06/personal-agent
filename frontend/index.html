@@ -1581,12 +1581,13 @@
           <span class="prompt">$</span>
           <input id="pwInput" type="password" placeholder="Enter passphrase" autocomplete="off" />
         </div>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" id="loginBtn">
           <span>Enter Sage</span>
           <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
             <path d="M3 8h10M9 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+        <p id="loginError" style="display:none;margin:0;font-family:var(--mono);font-size:12px;color:var(--err);text-align:center;"></p>
       </form>
 
       <div class="login-foot">
@@ -2109,27 +2110,350 @@
 </div>
 
 <script>
-  // -------- Login --------
-  const loginForm = document.getElementById('loginForm');
-  const pwInput = document.getElementById('pwInput');
+  // ================================================================
+  // Utilities
+  // ================================================================
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
 
-  function enterChat() {
+  function renderMarkdown(text) {
+    return String(text)
+      .split(/\n\n+/)
+      .map(para => {
+        const escaped = escapeHtml(para);
+        const formatted = escaped
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.+?)\*/g, '<em>$1</em>')
+          .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+          .replace(/\n/g, '<br>');
+        return `<p>${formatted}</p>`;
+      })
+      .join('');
+  }
+
+  function formatRelative(dateStr) {
+    if (!dateStr) return '';
+    const str = String(dateStr).trim();
+    const d = new Date(str.includes('T') ? str : str.replace(' ', 'T') + 'Z');
+    const diffMs = Date.now() - d.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return 'yesterday';
+    if (days < 7)  return `${days}d ago`;
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  function formatTime(dateStr) {
+    if (!dateStr) return '';
+    const str = String(dateStr).trim();
+    const d = new Date(str.includes('T') ? str : str.replace(' ', 'T') + 'Z');
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatNow() {
+    return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ================================================================
+  // API layer
+  // ================================================================
+  const API = '/api/v1';
+  function apiKey() { return sessionStorage.getItem('sage_key') || ''; }
+
+  async function apiFetch(method, path, body) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Sage-Key': apiKey() },
+    };
+    if (body != null) opts.body = JSON.stringify(body);
+    const res = await fetch(API + path, opts);
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      const err = new Error(text);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  }
+
+  // ================================================================
+  // State
+  // ================================================================
+  let currentSessionId = null;
+
+  // ================================================================
+  // Login
+  // ================================================================
+  const loginForm  = document.getElementById('loginForm');
+  const pwInput    = document.getElementById('pwInput');
+  const loginError = document.getElementById('loginError');
+  const loginBtn   = document.getElementById('loginBtn');
+
+  function setLoginError(msg) {
+    loginError.textContent = msg;
+    loginError.style.display = msg ? 'block' : 'none';
+    if (msg) {
+      pwInput.style.borderColor = 'var(--err)';
+      setTimeout(() => { pwInput.style.borderColor = ''; }, 1800);
+    }
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    loginBtn.disabled = true;
+    loginBtn.querySelector('span').textContent = 'Checking…';
+    try {
+      await apiFetch('POST', '/auth/login', { passphrase: pwInput.value });
+      sessionStorage.setItem('sage_key', pwInput.value);
+      await enterChat();
+    } catch (err) {
+      setLoginError(err.status === 401 ? 'Incorrect passphrase.' : 'Could not reach Sage — is the server running?');
+      pwInput.select();
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.querySelector('span').textContent = 'Enter Sage';
+    }
+  });
+
+  // ================================================================
+  // Enter chat — transition + load sessions
+  // ================================================================
+  async function enterChat() {
     document.body.dataset.screen = 'chat';
-    // Reveal chat shortly after starting transition
-    setTimeout(() => {
-      document.getElementById('login').hidden = true;
-    }, 520);
-    document.getElementById('chat').hidden = false;
-    // focus composer
+    setTimeout(() => { document.getElementById('login').hidden = true; }, 520);
+    const chatEl = document.getElementById('chat');
+    chatEl.hidden = false;
+    await loadSessions();
     setTimeout(() => document.getElementById('composerInput')?.focus(), 560);
   }
 
-  loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    enterChat();
+  // ================================================================
+  // Sessions sidebar
+  // ================================================================
+  async function loadSessions() {
+    try {
+      const sessions = await apiFetch('GET', '/sessions?limit=30');
+      renderSessionList(sessions);
+      if (sessions.length > 0) {
+        await switchSession(sessions[0].id, sessions[0].title);
+      } else {
+        await createAndSwitchSession();
+      }
+    } catch (err) {
+      console.error('loadSessions failed', err);
+    }
+  }
+
+  function renderSessionList(sessions) {
+    const list = document.getElementById('sessionList');
+    if (!list) return;
+    list.innerHTML = sessions.map((s, i) => `
+      <div class="session-item${i === 0 ? ' active' : ''}" data-id="${escapeHtml(s.id)}">
+        <div class="title">${escapeHtml(s.title || 'Untitled')}</div>
+        <div class="meta">${escapeHtml(formatRelative(s.updated_at))}</div>
+      </div>
+    `).join('');
+    bindSessionItems();
+  }
+
+  function bindSessionItems() {
+    document.querySelectorAll('.session-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const title = item.querySelector('.title')?.textContent || '';
+        switchSession(id, title);
+        if (window.innerWidth <= 900) document.body.dataset.sidebar = 'closed';
+      });
+    });
+  }
+
+  async function switchSession(id, title) {
+    currentSessionId = id;
+    const titleEl = document.getElementById('sessionTitle');
+    if (titleEl) titleEl.textContent = title || 'Untitled';
+    document.querySelectorAll('.session-item').forEach(i =>
+      i.classList.toggle('active', i.dataset.id === id)
+    );
+    await loadMessages(id);
+  }
+
+  async function createAndSwitchSession(title = '') {
+    const session = await apiFetch('POST', '/sessions', { title });
+    currentSessionId = session.id;
+    const titleEl = document.getElementById('sessionTitle');
+    if (titleEl) titleEl.textContent = 'New chat';
+    const list = document.getElementById('sessionList');
+    const item = document.createElement('div');
+    item.className = 'session-item active';
+    item.dataset.id = session.id;
+    item.innerHTML = `<div class="title">New chat</div><div class="meta">just now</div>`;
+    document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+    list?.prepend(item);
+    bindSessionItems();
+    const inner = document.querySelector('.thread-inner');
+    if (inner) inner.innerHTML = `<div class="session-marker"><hr/><span>new session · start typing below</span><hr/></div>`;
+    setTimeout(() => document.getElementById('composerInput')?.focus(), 60);
+  }
+
+  document.getElementById('newChatBtn')?.addEventListener('click', async () => {
+    try { await createAndSwitchSession(); }
+    catch (e) { console.error('newChat failed', e); }
   });
 
-  // -------- Profile screen --------
+  // ================================================================
+  // Thread — load & render messages
+  // ================================================================
+  const thread      = document.getElementById('thread');
+  const threadInner = thread?.querySelector('.thread-inner');
+
+  function scrollThreadToBottom() {
+    requestAnimationFrame(() => { if (thread) thread.scrollTop = thread.scrollHeight; });
+  }
+
+  async function loadMessages(sessionId) {
+    if (!threadInner) return;
+    threadInner.innerHTML = `<div class="session-marker"><hr/><span>loading…</span><hr/></div>`;
+    try {
+      const messages = await apiFetch('GET', `/sessions/${sessionId}/messages`);
+      renderMessages(messages);
+    } catch {
+      threadInner.innerHTML = `<div class="session-marker"><hr/><span style="color:var(--err)">failed to load messages</span><hr/></div>`;
+    }
+  }
+
+  function renderMessages(messages) {
+    if (!threadInner) return;
+    if (!messages.length) {
+      threadInner.innerHTML = `<div class="session-marker"><hr/><span>new session · start typing below</span><hr/></div>`;
+      return;
+    }
+    let html = `<div class="session-marker"><hr/><span>session started · local</span><hr/></div>`;
+    for (const m of messages) {
+      if (m.role === 'user') {
+        html += `<div class="msg msg-user"><div class="bubble">${escapeHtml(m.content)}</div></div>`;
+      } else {
+        html += `
+          <div class="msg msg-sage">
+            <div class="avatar-s">S</div>
+            <div class="bubble-wrap">
+              <div class="bubble">${renderMarkdown(m.content)}</div>
+              <div class="msg-meta"><span>${formatTime(m.created_at)}</span><span class="sources">· local</span></div>
+            </div>
+          </div>`;
+      }
+    }
+    threadInner.innerHTML = html;
+    scrollThreadToBottom();
+  }
+
+  // ================================================================
+  // Composer + send
+  // ================================================================
+  const ta      = document.getElementById('composerInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  function autosize() {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
+    sendBtn.classList.toggle('ready', ta.value.trim().length > 0);
+  }
+  ta.addEventListener('input', autosize);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  });
+  document.getElementById('composer')?.addEventListener('submit', (e) => {
+    e.preventDefault(); handleSend();
+  });
+
+  async function handleSend() {
+    const v = ta.value.trim();
+    if (!v || !currentSessionId) return;
+
+    // Remove the static demo typing indicator if still present
+    document.getElementById('typingMsg')?.remove();
+
+    const u = document.createElement('div');
+    u.className = 'msg msg-user';
+    u.innerHTML = `<div class="bubble">${escapeHtml(v)}</div>`;
+    threadInner.appendChild(u);
+
+    const typingEl = document.createElement('div');
+    typingEl.className = 'msg msg-sage';
+    typingEl.innerHTML = `<div class="avatar-s">S</div><div class="typing"><span></span><span></span><span></span></div>`;
+    threadInner.appendChild(typingEl);
+
+    ta.value = '';
+    autosize();
+    scrollThreadToBottom();
+
+    try {
+      const data = await apiFetch('POST', `/sessions/${currentSessionId}/chat`, { message: v });
+
+      // Auto-title the session on first message
+      const titleEl = document.getElementById('sessionTitle');
+      const currentTitle = titleEl?.textContent?.trim() || '';
+      if (!currentTitle || currentTitle === 'New chat' || currentTitle === 'Untitled') {
+        const autoTitle = v.slice(0, 60);
+        if (titleEl) titleEl.textContent = autoTitle;
+        const sideTitle = document.querySelector(`.session-item[data-id="${currentSessionId}"] .title`);
+        if (sideTitle) sideTitle.textContent = autoTitle;
+        apiFetch('PATCH', `/sessions/${currentSessionId}`, { title: autoTitle }).catch(() => {});
+      }
+
+      const srcCount = data.sources?.length || 0;
+      const srcLabel = srcCount ? `· ${srcCount} source${srcCount > 1 ? 's' : ''}` : '';
+
+      const replyEl = document.createElement('div');
+      replyEl.className = 'msg msg-sage';
+      replyEl.innerHTML = `
+        <div class="avatar-s">S</div>
+        <div class="bubble-wrap">
+          <div class="bubble">${renderMarkdown(data.reply)}</div>
+          <div class="msg-meta">
+            <span>${formatNow()}</span>
+            <span class="sources">${srcLabel} · local · ${data.latency_ms}ms</span>
+          </div>
+        </div>`;
+      typingEl.replaceWith(replyEl);
+    } catch (err) {
+      const errEl = document.createElement('div');
+      errEl.className = 'msg msg-sage';
+      errEl.innerHTML = `
+        <div class="avatar-s">S</div>
+        <div class="bubble-wrap">
+          <div class="bubble" style="color:var(--err)">
+            ${err.status === 401 ? 'Session expired — please refresh and log in again.' : 'No response from Sage. Is the server running?'}
+          </div>
+        </div>`;
+      typingEl.replaceWith(errEl);
+    }
+    scrollThreadToBottom();
+  }
+
+  // ================================================================
+  // Session title inline edit → PATCH
+  // ================================================================
+  const sessionTitleEl = document.getElementById('sessionTitle');
+  sessionTitleEl?.addEventListener('blur', () => {
+    const title = sessionTitleEl.textContent.trim();
+    if (!currentSessionId || !title) return;
+    apiFetch('PATCH', `/sessions/${currentSessionId}`, { title }).catch(() => {});
+    const sideTitle = document.querySelector(`.session-item[data-id="${currentSessionId}"] .title`);
+    if (sideTitle) sideTitle.textContent = title;
+  });
+  sessionTitleEl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sessionTitleEl.blur(); }
+  });
+
+  // ================================================================
+  // Profile screen
+  // ================================================================
   function openProfile() {
     document.getElementById('profile').hidden = false;
     document.body.dataset.screen = 'profile';
@@ -2158,39 +2482,34 @@
     setTimeout(() => { btn.innerHTML = orig; }, 1800);
   });
 
-  // Render habits, heatmap, topics
   function renderProfileWidgets() {
-    // habits
     const habits = [
-      { name: 'Morning pages',     icon: '✎', week: ['done','done','done','done','done','done','done'], streak: 31 },
-      { name: 'Run',               icon: 'R', week: ['skip','done','skip','skip','done','skip','skip'], streak: 6  },
-      { name: 'No phone after 10p',icon: '☾', week: ['done','done','skip','done','done','done','done'], streak: 4  },
-      { name: 'Read 20 min',       icon: '⌶', week: ['done','done','done','skip','done','done','future'], streak: 12 },
+      { name: 'Morning pages',      icon: '✎', week: ['done','done','done','done','done','done','done'], streak: 31 },
+      { name: 'Run',                icon: 'R',  week: ['skip','done','skip','skip','done','skip','skip'], streak: 6  },
+      { name: 'No phone after 10p', icon: '☾', week: ['done','done','skip','done','done','done','done'], streak: 4  },
+      { name: 'Read 20 min',        icon: '⌶', week: ['done','done','done','skip','done','done','future'], streak: 12 },
     ];
     const hCard = document.getElementById('habitsCard');
     if (hCard) {
       hCard.innerHTML = habits.map(h => `
         <div class="habit-row">
-          <div class="name"><span class="icon">${h.icon}</span>${h.name}</div>
+          <div class="name"><span class="icon">${h.icon}</span>${escapeHtml(h.name)}</div>
           <div class="habit-week">${h.week.map(d => `<span class="day ${d}"></span>`).join('')}</div>
           <div class="habit-streak"><span class="num">${h.streak}</span> day streak</div>
         </div>
       `).join('');
     }
 
-    // heatmap: 7 days x 24 hours, with "active 9-11am" pattern
     const heat = document.getElementById('heatmap');
     if (heat) {
       const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-      // pseudo-random but biased pattern
-      function val(d, h) {
+      function hval(d, h) {
         let v = 0;
         if (h >= 9 && h <= 11) v = 3 + ((d + h) % 2);
         else if (h >= 14 && h <= 16) v = 2;
         else if (h >= 20 && h <= 22) v = 1 + ((d * h) % 2);
         else if (h >= 7 && h < 9) v = 1;
-        else v = 0;
-        if (d === 5 || d === 6) v = Math.max(0, v - 1); // weekend cooler
+        if (d >= 5) v = Math.max(0, v - 1);
         if ((d * 7 + h) % 17 === 0) v = Math.min(4, v + 1);
         return Math.min(4, v);
       }
@@ -2198,39 +2517,37 @@
       for (let d = 0; d < 7; d++) {
         html += `<span class="day-label">${days[d]}</span>`;
         for (let h = 0; h < 24; h++) {
-          html += `<span class="cell" data-v="${val(d,h)}" title="${days[d]} · ${String(h).padStart(2,'0')}:00"></span>`;
+          html += `<span class="cell" data-v="${hval(d,h)}" title="${days[d]} · ${String(h).padStart(2,'0')}:00"></span>`;
         }
       }
       html += `<div class="heatmap-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>`;
       heat.innerHTML = html;
     }
 
-    // topics
     const topics = [
-      { tag: '#thesis',     label: 'thesis writing & advisor sync',  count: 38, pct: 100 },
-      { tag: '#diffusion',  label: 'diffusion model research',        count: 31, pct: 82  },
-      { tag: '#email',      label: 'inbox triage',                    count: 22, pct: 58  },
-      { tag: '#travel',     label: 'Lisbon trip planning',            count: 14, pct: 37  },
-      { tag: '#code',       label: 'PyTorch debugging',               count: 11, pct: 29  },
-      { tag: '#reading',    label: 'book notes & ingestion',          count: 8,  pct: 21  },
+      { tag: '#thesis',    label: 'thesis writing & advisor sync', count: 38, pct: 100 },
+      { tag: '#diffusion', label: 'diffusion model research',       count: 31, pct: 82  },
+      { tag: '#email',     label: 'inbox triage',                   count: 22, pct: 58  },
+      { tag: '#travel',    label: 'Lisbon trip planning',           count: 14, pct: 37  },
+      { tag: '#code',      label: 'PyTorch debugging',              count: 11, pct: 29  },
+      { tag: '#reading',   label: 'book notes & ingestion',         count: 8,  pct: 21  },
     ];
     const tList = document.getElementById('topicList');
     if (tList) {
       tList.innerHTML = topics.map(t => `
         <div class="topic">
-          <div class="label"><span class="tag">${t.tag}</span>${t.label}</div>
+          <div class="label"><span class="tag">${escapeHtml(t.tag)}</span>${escapeHtml(t.label)}</div>
           <div class="count">${t.count}</div>
           <div class="bar"><div class="fill" data-w="${t.pct}%"></div></div>
         </div>
       `).join('');
-      // animate
       requestAnimationFrame(() => {
         tList.querySelectorAll('.fill').forEach(el => el.style.width = el.dataset.w);
       });
     }
   }
 
-  // Forget interactions
+  // Forget fact animation
   document.addEventListener('click', (e) => {
     const f = e.target.closest('.fact .forget');
     if (!f) return;
@@ -2246,98 +2563,17 @@
     setTimeout(() => fact.remove(), 240);
   });
 
-  // -------- Composer --------
-  const ta = document.getElementById('composerInput');
-  const sendBtn = document.getElementById('sendBtn');
-
-  function autosize() {
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
-    sendBtn.classList.toggle('ready', ta.value.trim().length > 0);
-  }
-  ta.addEventListener('input', autosize);
-  ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  });
-
-  document.getElementById('composer').addEventListener('submit', (e) => {
-    e.preventDefault();
-    handleSend();
-  });
-
-  const thread = document.getElementById('thread');
-  const threadInner = thread.querySelector('.thread-inner');
-  const typingMsg = document.getElementById('typingMsg');
-
-  function scrollThreadToBottom() {
-    requestAnimationFrame(() => {
-      thread.scrollTop = thread.scrollHeight;
-    });
-  }
-  // start at the typing indicator
-  setTimeout(scrollThreadToBottom, 100);
-
-  function handleSend() {
-    const v = ta.value.trim();
-    if (!v) return;
-    // remove old typing indicator
-    if (typingMsg.parentNode) typingMsg.remove();
-
-    // append user message
-    const u = document.createElement('div');
-    u.className = 'msg msg-user';
-    u.innerHTML = `<div class="bubble"></div>`;
-    u.querySelector('.bubble').textContent = v;
-    threadInner.appendChild(u);
-
-    // append typing
-    const t = document.createElement('div');
-    t.className = 'msg msg-sage';
-    t.innerHTML = `<div class="avatar-s">S</div><div class="typing"><span></span><span></span><span></span></div>`;
-    threadInner.appendChild(t);
-
-    ta.value = '';
-    autosize();
-    scrollThreadToBottom();
-
-    // mock response after a beat
-    setTimeout(() => {
-      const reply = document.createElement('div');
-      reply.className = 'msg msg-sage';
-      reply.innerHTML = `
-        <div class="avatar-s">S</div>
-        <div class="bubble-wrap">
-          <div class="bubble">
-            <p>Got it. <em>Working locally — nothing leaves your machine.</em></p>
-          </div>
-          <div class="msg-meta"><span>just now</span><span class="sources">· local · 0.8s</span></div>
-        </div>`;
-      t.replaceWith(reply);
-      scrollThreadToBottom();
-    }, 1100);
-  }
-
-  // -------- Sidebar (mobile) --------
+  // ================================================================
+  // Sidebar mobile open/close
+  // ================================================================
   const body = document.body;
   document.getElementById('sbOpen')?.addEventListener('click', () => body.dataset.sidebar = 'open');
   document.getElementById('sbClose')?.addEventListener('click', () => body.dataset.sidebar = 'closed');
   document.getElementById('sbBackdrop')?.addEventListener('click', () => body.dataset.sidebar = 'closed');
 
-  // -------- Session list --------
-  document.querySelectorAll('.session-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      const t = item.querySelector('.title')?.textContent;
-      if (t) document.getElementById('sessionTitle').textContent = t;
-      if (window.innerWidth <= 900) body.dataset.sidebar = 'closed';
-    });
-  });
-
-  // -------- Cmd-K / Help palette --------
+  // ================================================================
+  // Cmd-K / Help palette
+  // ================================================================
   const COMMANDS = [
     // Help
     { cmd: '/help',                args: '',                       desc: 'Show this help / command palette',          group: 'Help',         badge: 'meta' },
@@ -2451,12 +2687,6 @@
         el.scrollIntoViewIfNeeded ? el.scrollIntoViewIfNeeded() : el.scrollIntoView({block:'nearest'});
       }
     });
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, ch => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[ch]));
   }
 
   function openPalette(prefill = '') {
