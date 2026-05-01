@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.api.deps import get_chat_service, get_registry, require_auth
+from app.config import get_settings
 from app.core.analytics_service import AnalyticsService
 from app.core.chat_service import ChatService
 from app.storage.sqlite_registry import SQLiteRegistry
@@ -54,7 +55,12 @@ async def get_profile(
     total_docs = row["docs"] if row else 0
     total_chunks = row["chunks"] if row else 0
 
-    username = os.environ.get("USER") or os.environ.get("USERNAME") or "local user"
+    username = (
+        get_settings().sage_username
+        or os.environ.get("USER")
+        or os.environ.get("USERNAME")
+        or "local user"
+    )
 
     return ProfileOut(
         username=username,

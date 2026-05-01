@@ -51,6 +51,7 @@ class Settings(BaseModel):
     # Web UI auth — set SAGE_PASSPHRASE in .env to require a passphrase on login.
     # Leave empty to disable auth (local-only installs).
     sage_passphrase: str = ""
+    sage_username: str = ""
 
     @model_validator(mode="after")
     def validate_chunking(self) -> "Settings":
