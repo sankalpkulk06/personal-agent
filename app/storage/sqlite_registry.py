@@ -33,6 +33,8 @@ class SQLiteRegistry:
             self._connection.execute("ALTER TABLE documents ADD COLUMN source_url TEXT")
         if "ingested_at" not in existing:
             self._connection.execute("ALTER TABLE documents ADD COLUMN ingested_at DATETIME")
+        self._connection.execute("UPDATE documents SET source_type = 'local' WHERE source_type IS NULL")
+        self._connection.execute("UPDATE documents SET ingested_at = CURRENT_TIMESTAMP WHERE ingested_at IS NULL")
 
     def close(self) -> None:
         self._connection.close()
@@ -175,6 +177,22 @@ class SQLiteRegistry:
             (limit,),
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def update_session_title(self, session_id: str, title: str) -> None:
+        self._connection.execute(
+            "UPDATE chat_sessions SET title = ? WHERE session_id = ?",
+            (title, session_id),
+        )
+        self._connection.commit()
+
+    def delete_session(self, session_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM chat_turns WHERE session_id = ?", (session_id,)
+        )
+        self._connection.execute(
+            "DELETE FROM chat_sessions WHERE session_id = ?", (session_id,)
+        )
+        self._connection.commit()
 
     def insert_fact(self, fact_id: str, content: str, category: str, source: str = "user", confidence_score: float = 1.0) -> None:
         self._connection.execute(

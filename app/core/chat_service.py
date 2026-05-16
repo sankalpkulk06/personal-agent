@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional
 from app.core.qa_service import QAResult
 from app.core.fact_service import FactService
 from app.core.habit_service import HabitService
+from app.services.email_service import EmailService
 from app.services.news_service import NewsService, NewsArticle
 from app.services.reminders_service import RemindersService
 from app.core.tool_executor import ToolExecutor
@@ -17,6 +18,26 @@ from app.providers.ollama_chat import OllamaChatProvider
 from app.retrieval.prompt_builder import build_chat_messages, build_system_message_with_tools
 from app.retrieval.retriever import Retriever, RetrievalResult
 from app.storage.sqlite_registry import SQLiteRegistry
+
+_EMAIL_TRIGGERS = {
+    "check my email", "check email", "any emails", "any email",
+    "show my email", "show email", "read my email", "read email",
+    "email inbox", "check inbox", "what emails", "do i have email",
+    "email triage", "triage email", "triage my email",
+    "check my gmail", "check gmail", "my gmail",
+}
+_EMAIL_ACTION_WORDS = {"check", "any", "show", "read", "triage", "fetch", "get", "what", "action", "gmail"}
+
+
+def _is_email_request(text: str) -> bool:
+    t = text.lower().strip()
+    if t in _EMAIL_TRIGGERS:
+        return True
+    if ("/email" in t or "/email-personal" in t):
+        return True
+    if ("email" in t or "inbox" in t or "gmail" in t) and any(w in t for w in _EMAIL_ACTION_WORDS):
+        return True
+    return False
 
 
 class ChatService:
@@ -65,6 +86,7 @@ class ChatService:
         web_search_service: Optional[WebSearchService] = None,
         habit_service: Optional[HabitService] = None,
         url_ingestion_service: Optional[URLIngestionService] = None,
+        email_service: Optional[EmailService] = None,
         schedule_todo_callback: Optional[Callable[[dict[str, Any]], None]] = None,
         twilio_daily_message_limit: int = 50,
         max_prompt_chunks: int = 5,
@@ -80,6 +102,7 @@ class ChatService:
         self._web_search_service = web_search_service
         self._habit_service = habit_service
         self._url_ingestion_service = url_ingestion_service
+        self._email_service = email_service
         self._schedule_todo_callback = schedule_todo_callback
         self._twilio_daily_message_limit = twilio_daily_message_limit
         self._max_prompt_chunks = max_prompt_chunks
@@ -203,6 +226,15 @@ class ChatService:
                 session_id=session_id,
                 question=question,
                 answer=direct_answer,
+                history=history,
+            )
+
+        email_answer = self._answer_email_request(question, response_style=response_style)
+        if email_answer is not None:
+            return self._record_answer(
+                session_id=session_id,
+                question=question,
+                answer=email_answer,
                 history=history,
             )
 
@@ -415,6 +447,10 @@ class ChatService:
         """Handle slash commands without relying on model tool selection."""
         command = question.strip()
         lowered = command.lower()
+
+        if lowered in ("/sources",) or "what have you saved" in lowered or "what did you save" in lowered:
+            return self._sources_command(response_style=response_style)
+
         if not lowered.startswith("/"):
             return None
 
@@ -525,9 +561,6 @@ class ChatService:
             )
             return f"🌱 *Habit commands*\n{help_text}" if self._is_whatsapp_style(response_style) else help_text
 
-        if lowered == "/sources" or "what have you saved" in lowered or "what did you save" in lowered:
-            return self._sources_command(response_style=response_style)
-
         return None
 
     def _sources_command(self, response_style: Optional[str] = None) -> str:
@@ -618,6 +651,57 @@ class ChatService:
         if chat_usage["other"]:
             text += f"\nOther chats: {chat_usage['other']}"
         return self._style_status(text, "📊", response_style)
+
+    def _answer_email_request(
+        self, question: str, response_style: Optional[str] = None
+    ) -> Optional[str]:
+        """Fetch and triage Gmail if the question is an email request."""
+        if not _is_email_request(question):
+            return None
+        if not self._email_service:
+            return self._style_status(
+                "Gmail isn't configured yet. Run `sage email-personal` from the CLI to set up OAuth, "
+                "then restart the server.",
+                "📭",
+                response_style,
+            )
+        try:
+            emails = self._email_service.fetch_recent()
+        except FileNotFoundError:
+            return self._style_status(
+                "Gmail credentials not found. Run `sage email-personal` from the CLI first to authorise access.",
+                "🔑",
+                response_style,
+            )
+        except Exception as exc:
+            return self._style_status(f"Failed to fetch emails: {exc}", "⚠️", response_style)
+
+        if not emails:
+            return self._style_status("Your inbox is empty — nothing to report.", "📭", response_style)
+
+        try:
+            triaged = self._email_service.triage(emails, self._chat_provider)
+        except Exception as exc:
+            return self._style_status(f"Fetched {len(emails)} emails but triage failed: {exc}", "⚠️", response_style)
+
+        action_items = [t for t in triaged if t.category == "action"]
+        fyi_items    = [t for t in triaged if t.category == "fyi"]
+
+        lines = [f"Checked {len(emails)} emails. Here's what needs your attention:\n"]
+        if action_items:
+            lines.append(f"**ACTION NEEDED ({len(action_items)})**")
+            for i, item in enumerate(action_items, 1):
+                lines.append(f"{i}. **{item.email.sender}** — {item.email.subject}\n   → {item.reason}")
+            lines.append("")
+        else:
+            lines.append("No action needed.\n")
+
+        if fyi_items:
+            lines.append(f"**FYI ({len(fyi_items)})**")
+            for i, item in enumerate(fyi_items, 1):
+                lines.append(f"{i}. **{item.email.sender}** — {item.email.subject}\n   → {item.reason}")
+
+        return self._style_status("\n".join(lines), None, response_style)
 
     def _answer_news_query(
         self, question: str, response_style: Optional[str] = None
@@ -771,6 +855,36 @@ class ChatService:
             title: Optional session title
         """
         self._registry.create_session(session_id=session_id, title=title)
+
+    def generate_session_title(self, session_id: str) -> str:
+        """Ask the LLM to summarise the session in ≤5 words, persist, and return it."""
+        turns = self._registry.get_session_turns(session_id)
+        if not turns:
+            return ""
+
+        # Build a compact transcript (first 6 turns max to keep the prompt tiny)
+        lines = []
+        for t in turns[:6]:
+            role = "User" if t["role"] == "user" else "Sage"
+            lines.append(f"{role}: {t['content'][:200]}")
+        transcript = "\n".join(lines)
+
+        prompt = (
+            "Generate a short title for this conversation. "
+            "The title must be 5 words or fewer, sentence case, no punctuation, no quotes.\n\n"
+            f"{transcript}\n\nTitle:"
+        )
+        try:
+            raw = self._chat_provider.generate(prompt)
+            title = raw.strip().strip('"\'').strip()
+            # Hard-cap at 60 chars in case the model misbehaves
+            title = title[:60]
+        except Exception:
+            return ""
+
+        if title:
+            self._registry.update_session_title(session_id=session_id, title=title)
+        return title
 
     def list_sessions(self, limit: int = 20) -> List[dict]:
         """List recent chat sessions.

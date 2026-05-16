@@ -310,7 +310,7 @@ class SearchDocumentsTool(Tool):
                     if c.source_type == "url" and c.source_url:
                         label = f"{c.file_name} ({_up(c.source_url).netloc}) 🌐"
                     else:
-                        label = c.file_name or c.source_path or c.document_id
+                        label = f"{c.file_name or c.source_path or c.document_id} 📄"
                     lines.append(f"- [{label}]: {c.text[:150]}...")
                 return {"success": True, "result": "Found in your documents:\n\n" + "\n".join(lines)}
             return {"success": True, "result": f"No documents found matching '{query}'"}

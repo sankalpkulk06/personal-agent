@@ -19,6 +19,15 @@ _INGEST_TRIGGERS = re.compile(
 
 
 @dataclass
+class ScrapedPage:
+    url: str
+    title: str
+    content: str
+    word_count: int
+    scraped_at: datetime
+
+
+@dataclass
 class URLIngestionResult:
     success: bool
     url: str
@@ -46,6 +55,10 @@ class URLIngestionService:
         self._min_words = min_words
         self._max_words = max_words
 
+    def is_url(self, text: str) -> bool:
+        stripped = text.strip().rstrip(".,)")
+        return _URL_RE.fullmatch(stripped) is not None
+
     def extract_url(self, text: str) -> Optional[str]:
         match = _URL_RE.search(text)
         return match.group(0).rstrip(".,)") if match else None
@@ -62,6 +75,9 @@ class URLIngestionService:
     def already_ingested(self, url: str) -> bool:
         return self._registry.is_url_ingested(url)
 
+    def list_url_sources(self) -> list[dict]:
+        return self._registry.list_url_sources()
+
     def ingest(self, url: str) -> URLIngestionResult:
         if self.already_ingested(url):
             return URLIngestionResult(
@@ -75,42 +91,39 @@ class URLIngestionService:
             )
 
         try:
-            title, content = self._scrape(url)
+            page = self.scrape(url)
         except _ScrapeError as exc:
             return URLIngestionResult(
                 success=False, url=url, title=None, summary=None,
                 chunks_added=0, already_existed=False, error=exc.code,
             )
 
-        words = content.split()
-        if len(words) < self._min_words:
+        if page.word_count < self._min_words:
             return URLIngestionResult(
-                success=False, url=url, title=title, summary=None,
+                success=False, url=url, title=page.title, summary=None,
                 chunks_added=0, already_existed=False, error="too_short",
             )
 
-        if len(words) > self._max_words:
-            content = " ".join(words[: self._max_words])
-
-        summary = self._summarize(title, content)
+        summary = self._summarize(page.title, page.content)
 
         _, chunks_added = self._coordinator.ingest_text(
-            content=content,
-            title=title,
+            content=page.content,
+            title=page.title,
             source_url=url,
+            extra_metadata={"ingested_at": page.scraped_at.isoformat()},
         )
 
         return URLIngestionResult(
             success=True,
             url=url,
-            title=title,
+            title=page.title,
             summary=summary,
             chunks_added=chunks_added,
             already_existed=False,
             error=None,
         )
 
-    def _scrape(self, url: str) -> tuple[str, str]:
+    def scrape(self, url: str) -> ScrapedPage:
         try:
             resp = httpx.get(
                 url,
@@ -135,8 +148,18 @@ class URLIngestionService:
 
         main = soup.find("article") or soup.find("main") or soup.find("body")
         content = main.get_text(separator="\n", strip=True) if main else ""
+        words = content.split()
+        if len(words) > self._max_words:
+            content = " ".join(words[: self._max_words])
+            words = content.split()
 
-        return title, content
+        return ScrapedPage(
+            url=url,
+            title=title,
+            content=content,
+            word_count=len(words),
+            scraped_at=datetime.utcnow(),
+        )
 
     def _summarize(self, title: str, content: str) -> str:
         first_500 = " ".join(content.split()[:500])

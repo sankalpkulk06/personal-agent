@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS documents (
     parser_name TEXT NOT NULL,
     content_length INTEGER NOT NULL,
     metadata_json TEXT NOT NULL DEFAULT '{}',
+    source_type TEXT NOT NULL DEFAULT 'local',
+    source_url TEXT,
+    ingested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

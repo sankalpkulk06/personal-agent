@@ -2,7 +2,7 @@
 
 **Est. effort:** 3–4 days
 **Dependencies:** Existing `IngestService`, `ChromaStore`, `SQLiteRegistry`, `ChatService`
-**Status:** Not started
+**Status:** Complete
 
 ---
 
@@ -59,9 +59,9 @@ def _migrate_documents_columns(self) -> None:
 ```
 
 **AC:**
-- [ ] On startup, existing `documents` rows get `source_type='local'` by default
-- [ ] Migration is idempotent (safe to run twice)
-- [ ] New columns visible via `PRAGMA table_info(documents)`
+- [x] On startup, existing `documents` rows get `source_type='local'` by default
+- [x] Migration is idempotent (safe to run twice)
+- [x] New columns visible via `PRAGMA table_info(documents)`
 
 ---
 
@@ -166,12 +166,12 @@ ARTICLE START:
 ```
 
 **AC:**
-- [ ] `is_url("https://x.com/y")` is `True`; `is_url("hi there")` is `False`
-- [ ] `extract_url("save this https://foo.com bar")` returns `"https://foo.com"`
-- [ ] `scrape()` returns cleaned text from `<article>`/`<main>` (nav/footer stripped)
-- [ ] `ingest()` writes one document row + N chunks + Chroma vectors
-- [ ] `already_ingested()` returns `True` after a successful ingest of the same URL
-- [ ] All error paths return `IngestionResult(success=False, error=...)` — never raise
+- [x] `is_url("https://x.com/y")` is `True`; `is_url("hi there")` is `False`
+- [x] `extract_url("save this https://foo.com bar")` returns `"https://foo.com"`
+- [x] `scrape()` returns cleaned text from `<article>`/`<main>` (nav/footer stripped)
+- [x] `ingest()` writes one document row + N chunks + Chroma vectors
+- [x] `already_ingested()` returns `True` after a successful ingest of the same URL
+- [x] All error paths return `IngestionResult(success=False, error=...)` — never raise
 
 ---
 
@@ -206,9 +206,9 @@ def ingest_parsed(
 Add `set_document_source(document_id, source_type, source_url)` to `SQLiteRegistry`.
 
 **AC:**
-- [ ] Existing local-file ingestion still works unchanged (uses `source_type='local'` default)
-- [ ] URL ingestion populates `source_type='url'`, `source_url=<url>` on the document row
-- [ ] Each chunk stored in Chroma carries `source_type` + `source_url` + `title` metadata
+- [x] Existing local-file ingestion still works unchanged (uses `source_type='local'` default)
+- [x] URL ingestion populates `source_type='url'`, `source_url=<url>` on the document row
+- [x] Each chunk stored in Chroma carries `source_type` + `source_url` + `title` metadata
 
 ---
 
@@ -254,10 +254,10 @@ def _format_url_error(self, error: str) -> str:
 Inject `url_ingestion_service` via `ChatService.__init__` (optional, like other services). Wire it up in the CLI factory (`commands_ask.py` / `commands_chat.py`) and the webhook bootstrap.
 
 **AC:**
-- [ ] Bare URL in CLI chat triggers ingest + confirmation
-- [ ] Bare URL in WhatsApp webhook triggers ingest + Twilio reply
-- [ ] "remember this https://foo.com" triggers ingest (URL detected anywhere in the message)
-- [ ] If `URL_INGESTION_ENABLED=false`, message falls through to normal routing
+- [x] Bare URL in CLI chat triggers ingest + confirmation
+- [x] Bare URL in WhatsApp webhook triggers ingest + Twilio reply
+- [x] "remember this https://foo.com" triggers ingest (URL detected anywhere in the message)
+- [x] If `URL_INGESTION_ENABLED=false`, message falls through to normal routing
 
 ---
 
@@ -278,9 +278,9 @@ def format_source_line(idx: int, chunk_metadata: dict) -> str:
 ```
 
 **AC:**
-- [ ] URL sources render with 🌐, domain, and saved date
-- [ ] Local files render with 📄
-- [ ] Mixed result sets list both formats correctly
+- [x] URL sources render with 🌐, domain, and saved date
+- [x] Local files render with 📄
+- [x] Mixed result sets list both formats correctly
 
 ---
 
@@ -304,9 +304,9 @@ def sources():
 Also wire `"what have you saved?"` / `"/sources"` as a slash command inside `sage chat` (handled by `ChatService`).
 
 **AC:**
-- [ ] `sage sources` prints all URL and local sources, numbered
-- [ ] `/sources` works inside `sage chat`
-- [ ] "what have you saved?" works in WhatsApp + CLI (via intent match in ChatService)
+- [x] `sage sources` prints all URL and local sources, numbered
+- [x] `/sources` works inside `sage chat`
+- [x] "what have you saved?" works in WhatsApp + CLI (via intent match in ChatService)
 
 ---
 
@@ -331,8 +331,8 @@ URL_MAX_CONTENT_WORDS=50000
 ```
 
 **AC:**
-- [ ] App boots with defaults if env vars absent
-- [ ] `URL_INGESTION_ENABLED=false` disables URL detection in `ChatService`
+- [x] App boots with defaults if env vars absent
+- [x] `URL_INGESTION_ENABLED=false` disables URL detection in `ChatService`
 
 ---
 
@@ -348,18 +348,18 @@ beautifulsoup4>=4.12
 `httpx` may already be present (used in tests); ensure it's in production deps.
 
 **AC:**
-- [ ] Fresh `pip install -e .` installs both packages
-- [ ] `from bs4 import BeautifulSoup` and `import httpx` succeed at runtime
+- [x] Fresh `pip install -e .` installs both packages
+- [x] `from bs4 import BeautifulSoup` and `import httpx` succeed at runtime
 
 ---
 
 ## Acceptance Criteria (phase complete)
 
-- [ ] Bare URL in any input triggers automatic ingestion (CLI + WhatsApp)
-- [ ] Confirmation includes title + 2-sentence AI summary
-- [ ] Saved URLs queryable via RAG with 🌐 citation format
-- [ ] Duplicate URLs detected and skipped with friendly message
-- [ ] `/sources` lists all URL + local sources
-- [ ] Graceful error messages for 404, timeout, login walls, too-short pages
-- [ ] Migration is idempotent on existing `documents` rows
-- [ ] Unit tests cover detection, scraping (mocked HTTP), and dedup
+- [x] Bare URL in any input triggers automatic ingestion (CLI + WhatsApp)
+- [x] Confirmation includes title + 2-sentence AI summary
+- [x] Saved URLs queryable via RAG with 🌐 citation format
+- [x] Duplicate URLs detected and skipped with friendly message
+- [x] `/sources` lists all URL + local sources
+- [x] Graceful error messages for 404, timeout, login walls, too-short pages
+- [x] Migration is idempotent on existing `documents` rows
+- [x] Unit tests cover detection, scraping (mocked HTTP), and dedup

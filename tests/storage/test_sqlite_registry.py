@@ -62,6 +62,10 @@ def test_sqlite_registry_initializes_schema(tmp_path):
             "whatsapp_usage_alerts",
             "whatsapp_usage_daily",
         ]
+        document_columns = {
+            row["name"] for row in registry._connection.execute("PRAGMA table_info(documents)").fetchall()  # noqa: SLF001
+        }
+        assert {"source_type", "source_url", "ingested_at"} <= document_columns
     finally:
         registry.close()
 
@@ -180,6 +184,8 @@ def test_sqlite_registry_upsert_and_lookup_document_and_chunk(tmp_path):
         assert stored_doc is not None
         assert stored_doc["document_id"] == document_id
         assert stored_doc["file_name"] == "sample.txt"
+        assert stored_doc["source_type"] == "local"
+        assert stored_doc["ingested_at"] is not None
         assert stored_doc["metadata_json"]["tag"] == "study"
 
         assert stored_chunk is not None

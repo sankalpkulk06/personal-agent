@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.cli.commands_ask import ask_command
 from app.cli.commands_ingest import ingest_command
 from app.cli.commands_serve import serve_command
+from app.storage.sqlite_registry import SQLiteRegistry
 
 cli = typer.Typer(
     add_completion=False,
@@ -61,6 +62,34 @@ def ask(
     export: bool = typer.Option(False, "--export", help="Export answer to Markdown file."),
 ) -> None:
     ask_command(question=question, top_k=top_k, export=export)
+
+
+@cli.command("sources")
+def sources() -> None:
+    """List all ingested sources."""
+    settings = get_settings()
+    paths = settings.resolve_paths()
+    registry = SQLiteRegistry(paths.sqlite_db_path)
+    try:
+        saved = registry.list_all_sources()
+    finally:
+        registry.close()
+
+    if not saved:
+        typer.echo("No sources saved yet.")
+        return
+
+    typer.echo(f"Saved sources ({len(saved)}):")
+    idx = 1
+    for source in [s for s in saved if s.get("source_type") == "url"]:
+        from urllib.parse import urlparse
+
+        domain = urlparse(source.get("source_url") or "").netloc or source.get("source_url", "")
+        typer.echo(f"{idx}. {source.get('file_name', 'untitled')} — {domain} 🌐")
+        idx += 1
+    for source in [s for s in saved if s.get("source_type") != "url"]:
+        typer.echo(f"{idx}. {source.get('file_name') or source.get('source_path') or 'untitled'} 📄")
+        idx += 1
 
 
 @cli.command("chat")

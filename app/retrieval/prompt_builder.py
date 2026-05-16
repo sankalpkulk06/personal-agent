@@ -8,8 +8,15 @@ from app.retrieval.retriever import RetrievedChunk
 def _format_chunk_source(chunk: RetrievedChunk) -> str:
     if chunk.source_type == "url" and chunk.source_url:
         domain = urlparse(chunk.source_url).netloc
-        return f"{chunk.file_name} (from {domain})"
-    return chunk.file_name or chunk.source_path or chunk.document_id
+        ingested = str(
+            chunk.document_metadata.get("ingested_at")
+            or chunk.document_metadata.get("saved_at")
+            or ""
+        )[:10]
+        saved = f" (saved {ingested})" if ingested else ""
+        return f"{chunk.file_name or 'untitled'} — {domain} 🌐{saved}"
+    title = chunk.file_name or chunk.source_path or chunk.document_id
+    return f"{title} 📄 (local)"
 
 
 def build_grounded_prompt(question: str, chunks: List[RetrievedChunk], max_chunks: int = 5) -> str:
